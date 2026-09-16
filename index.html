@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#173b2b" />
+    <meta name="description" content="Get to know Blazemap: forest and land fire awareness for Kalimantan, community observations, human verification, and guidance for staying safe." />
+    <meta property="og:title" content="Blazemap — Know the signs. Care for our forests." />
+    <meta property="og:description" content="Learn how community observations, satellite indications, and human review contribute to forest and land fire awareness in Kalimantan." />
+    <meta property="og:type" content="website" />
+    <title>Blazemap — Forest & land fire awareness</title>
+    <style>
+      body { margin: 0; }
+      .preload-shell { box-sizing: border-box; display: grid; min-height: 100vh; min-height: 100dvh; place-content: center; justify-items: center; gap: 24px; padding: 24px; background: var(--color-background, #f7f7ef); color: var(--color-forest, #173b2b); font-family: "Nunito", system-ui, sans-serif; text-align: center; }
+      .preload-mark { display: block; width: 112px; height: 112px; }
+      .preload-track { stroke: var(--color-sage, #c4d0b5); stroke-width: 1.5; }
+      .preload-canopy { fill: var(--color-secondary, #e6eddf); }
+      .preload-sprout, .preload-orbit { stroke: currentColor; stroke-width: 2.8; stroke-linecap: round; stroke-linejoin: round; }
+      .preload-orbit { transform-origin: 56px 56px; animation: preload-orbit 1.6s linear infinite; }
+      @keyframes preload-orbit { to { transform: rotate(360deg); } }
+      @media (prefers-reduced-motion: reduce) { .preload-orbit { animation: none; } }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div class="preload-shell bg-background" role="status" aria-label="Loading" aria-live="polite" aria-atomic="true">
+        <svg class="preload-mark" viewBox="0 0 112 112" width="112" height="112" fill="none" aria-hidden="true" focusable="false">
+          <circle class="preload-track" cx="56" cy="56" r="50" />
+          <circle class="preload-canopy" cx="56" cy="56" r="38" />
+          <path class="preload-sprout" d="M56 77V58M56 62C42 62 34 54 34 41c14 0 22 8 22 21ZM56 54c0-14 8-22 22-22 0 14-8 22-22 22Z" />
+          <path class="preload-orbit" d="M56 6a50 50 0 0 1 50 50" />
+        </svg>
+      </div>
+    </div>
+    <noscript>
+      <style>#root { display: none; }</style>
+      <p class="preload-shell">Blazemap explains forest and land fire awareness in Kalimantan. Enable JavaScript to view the information page. Stay away from smoke and flames; in immediate danger, move to safety and contact local emergency services.</p>
+    </noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,11 @@
+export { default as governmentForest } from "./images/government-forest.webp";
+export { default as loginForest } from "./images/login-forest.webp";
+export { default as registerForest } from "./images/register-forest.webp";
+export { default as contactForest } from "./images/contact-forest.webp";
+export { default as foreground } from "./images/foreground.webp";
+export { default as fernLayer } from "./images/fern-layer.webp";
+export { default as rainforest } from "./images/rainforest.webp";
+export { default as rainforestSmall } from "./images/rainforest-small.webp";
+export { default as observation } from "./images/observation-photo.webp";
+export { default as review } from "./images/review-photo.webp";
+export { default as followup } from "./images/followup-photo.webp";

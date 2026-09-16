@@ -1,0 +1,108 @@
+@import "@fontsource/nunito/latin-400.css";
+@import "@fontsource/nunito/latin-600.css";
+@import "@fontsource/nunito/latin-700.css";
+@import "@fontsource/nunito/latin-800.css";
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Nunito", sans-serif;
+  --font-display: "Nunito", sans-serif;
+  --color-background: #f7f7ef;
+  --color-foreground: #213f30;
+  --color-primary: #294d36;
+  --color-primary-foreground: #ffffff;
+  --color-card: #ffffff;
+  --color-card-foreground: #213f30;
+  --color-secondary: #e6eddf;
+  --color-secondary-foreground: #213f30;
+  --color-muted: #edf0e7;
+  --color-muted-foreground: #596657;
+  --color-accent: #e87542;
+  --color-accent-foreground: #203d2b;
+  --color-forest: #173b2b;
+  --color-sage: #c4d0b5;
+  --color-border: #dce2d3;
+  --color-input: #dce2d3;
+  --color-ring: #456b37;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+}
+
+@layer base {
+  * { border-color: var(--color-border); }
+  html { scroll-padding-top: 2rem; background: var(--color-background); }
+  body { min-width: 320px; margin: 0; background: var(--color-background); color: var(--color-foreground); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+  h1, h2, h3, h4, h5, h6 { text-wrap: balance; }
+  p { text-wrap: pretty; }
+  :focus-visible { outline: 2px solid var(--color-ring); outline-offset: 4px; }
+  footer :focus-visible { outline-color: var(--color-sage); }
+  ::selection { background: var(--color-sage); color: var(--color-forest); }
+}
+
+.scroll-reveal:focus-within {
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+.forest-foliage-edge {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 10%), linear-gradient(to top, transparent, #000 16%);
+  mask-image: linear-gradient(to right, transparent, #000 10%), linear-gradient(to top, transparent, #000 16%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+
+.forest-breeze {
+  transform-origin: 15% 95%;
+  animation: forest-breeze 9s ease-in-out infinite alternate;
+}
+
+.forest-breeze-slow {
+  transform-origin: 20% 95%;
+  animation: forest-breeze 12s -4s ease-in-out infinite alternate-reverse;
+}
+
+.forest-side-foliage {
+  -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent);
+  mask-image: linear-gradient(to bottom, #000 70%, transparent);
+}
+
+.forest-fern-sway {
+  transform-origin: 50% 86%;
+  animation: forest-fern-sway 6.5s -2s ease-in-out infinite alternate;
+}
+
+@keyframes forest-fern-sway {
+  from { transform: rotate(1.3deg) skewX(0.5deg); }
+  to { transform: rotate(-1.2deg) skewX(-0.4deg); }
+}
+
+.forest-mist {
+  animation: forest-mist 18s ease-in-out infinite alternate;
+}
+
+@keyframes forest-breeze {
+  0% { transform: rotate(-0.7deg) skewX(-0.3deg); }
+  55% { transform: rotate(0.6deg) skewX(0.15deg); }
+  100% { transform: rotate(0.9deg) skewX(0.35deg); }
+}
+
+@keyframes forest-mist {
+  from { transform: translate3d(-3%, 0, 0); opacity: 0.3; }
+  to { transform: translate3d(3%, -3%, 0); opacity: 0.5; }
+}
+
+.not-found-scene {
+  width: 100%;
+  max-width: 320px;
+  height: auto;
+}
+
+@media (min-width: 640px) {
+  .not-found-scene { max-width: 420px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html, *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
