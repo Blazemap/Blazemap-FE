@@ -2,7 +2,7 @@ export type ObservationType = "SMOKE" | "FLAME" | "BURNING_SMELL";
 export type ReportDraft = {
   observationTypes: ObservationType[];
   observedLocal: string;
-  offset: "+07:00" | "+08:00";
+  timeChoice: "" | "NOW" | "EARLIER";
   locationMode: "INCIDENT_ESTIMATE" | "OBSERVER_POSITION";
   latitude: string;
   longitude: string;

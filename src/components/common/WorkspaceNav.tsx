@@ -26,8 +26,8 @@ export function WorkspaceNav({ user, children }: { user: DashboardUser; children
   return <header className="absolute left-1/2 top-3 z-50 flex w-[94%] max-w-5xl -translate-x-1/2 flex-col gap-2 rounded-[26px] bg-white px-3 py-2 shadow-lg sm:top-4 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:rounded-full sm:px-4 sm:py-2.5">
     <div className="flex min-w-0 items-center justify-between gap-2 sm:flex-1">
       <div className="flex min-w-0 shrink items-center gap-2 sm:gap-3">
-        <Link to={home} aria-label="Blazemap dashboard" className="min-w-0 shrink-0 transition-opacity hover:opacity-80"><Brand iconOnly /></Link>
-        {user.role === "USER" && <nav aria-label="Dashboard views" className="flex rounded-full border border-primary/10 bg-secondary/60 p-0.5 shadow-inner sm:p-1">
+        <Link to="/" aria-label="Blazemap home" className="min-w-0 shrink-0 transition-opacity hover:opacity-80"><Brand iconOnly /></Link>
+        <nav aria-label="Dashboard views" className="flex rounded-full border border-primary/10 bg-secondary/60 p-0.5 shadow-inner sm:p-1">
           {([[
             "map",
             "Map",
@@ -36,7 +36,7 @@ export function WorkspaceNav({ user, children }: { user: DashboardUser; children
             const active = view === "feed" ? feed : dashboard && !feed;
             return <Link key={view} to={destination(view)} aria-current={active ? "page" : undefined} className={`flex h-8 min-w-[52px] items-center justify-center gap-1 rounded-full px-2 text-[10px] font-extrabold transition-colors sm:min-w-[74px] sm:gap-1.5 sm:px-3 sm:text-[11px] ${active ? "bg-forest text-white shadow-sm" : "text-muted-foreground hover:bg-white hover:text-forest"}`}><Icon size={14} strokeWidth={2.5} aria-hidden="true" /><span>{label}</span></Link>;
           })}
-        </nav>}
+        </nav>
       </div>
       <div className="ml-auto min-w-0 shrink"><AccountMenu user={user} /></div>
     </div>

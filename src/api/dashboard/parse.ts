@@ -1,4 +1,5 @@
-import type { CasesData, Handling, MapData, MapItem, Verification } from "@/types";
+import type { CasesData, DemoArea, Handling, MapData, MapItem, Verification } from "@/types";
+import { parsePolygon, polygonArea, type PublicPerimeter } from "../../lib/perimeter.ts";
 
 function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid response");
@@ -51,11 +52,21 @@ export function parseMap(body: unknown): MapData {
   const cases = array(data.cases);
   const items: MapItem[] = cases.map((raw) => {
     const item = record(raw);
-    const mode = choice(item.publicLocationMode, ["NONE", "REGION_ONLY", "APPROVED_INCIDENT_POINT"]);
+    const mode = choice(item.publicLocationMode, ["NONE", "REGION_ONLY", "APPROVED_INCIDENT_POINT", "APPROVED_INCIDENT_PERIMETER"]);
+    let publicPerimeter: PublicPerimeter | undefined;
+    if (mode === "APPROVED_INCIDENT_PERIMETER") {
+      if (item.verificationStatus !== "CONFIRMED_FIRE") throw new Error("Perimeter publication requires a confirmed fire");
+      const p = record(item.publicPerimeter);
+      const geometry = parsePolygon(p.geometry), areaHectares = number(p.areaHectares), revision = number(p.revision), source = text(p.source).trim();
+      const computed = polygonArea(geometry);
+      if (areaHectares <= 0 || Math.abs(computed - areaHectares) > Math.max(1e-8, computed * 1e-9) || !Number.isInteger(revision) || revision < 1 || source.length < 3 || source.length > 300 || !/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(text(p.observedAt))) throw new Error("Invalid public perimeter metadata");
+      publicPerimeter = { geometry, areaHectares, revision, source, observedAt: date(p.observedAt) };
+    }
     return {
       id: `publication:${text(item.publicationId)}`, kind: "publication", title: text(item.title),
       ...point(item, mode === "APPROVED_INCIDENT_POINT"), time: date(item.publishedAt), source: "Published case summary",
       location: mode === "NONE" ? "Location withheld" : array(item.regions).map((region) => text(record(region).name)).join(", ") || "Approved incident location",
+      publicLocationMode: mode, ...(publicPerimeter ? { publicPerimeter } : {}),
       verification: verification(item.verificationStatus), handling: handling(item.handlingStatus), stale: false,
     };
   });
@@ -70,7 +81,25 @@ export function parseMap(body: unknown): MapData {
       frp: item.frp === null ? null : number(item.frp), fetchedAt: date(item.fetchedAt), stale: item.stale || sourceStatus !== "AVAILABLE",
     });
   }
-  return { items, sourceStatus, updatedAt: data.updatedAt === null ? null : date(data.updatedAt), lastSuccessAt: source.lastSuccessAt === undefined ? null : date(source.lastSuccessAt), limited: hotspots.length >= 2000 || cases.length >= 200 };
+  const demoAreas: DemoArea[] = array(data.demoAreas ?? []).map(raw => {
+    const area = record(raw), geometry = record(area.geometry);
+    const name = text(area.name), areaHectares = number(area.areaHectares);
+    if (area.demo !== true || !name.startsWith("[DEMO]") || geometry.type !== "Polygon" || areaHectares <= 0) throw new Error("Invalid demo area");
+    const coordinates = array(geometry.coordinates).map(rawRing => {
+      const ring: [number, number][] = array(rawRing).map(rawPoint => {
+        const pair = array(rawPoint);
+        if (pair.length !== 2) throw new Error("Invalid demo point");
+        const longitude = number(pair[0]), latitude = number(pair[1]);
+        if (Math.abs(longitude) > 180 || Math.abs(latitude) > 90) throw new Error("Invalid demo point");
+        return [longitude, latitude];
+      });
+      if (ring.length < 4 || ring.length > 10000 || JSON.stringify(ring[0]) !== JSON.stringify(ring.at(-1))) throw new Error("Invalid demo ring");
+      return ring;
+    });
+    if (!coordinates.length || coordinates.length > 100) throw new Error("Invalid demo polygon");
+    return { id: text(area.id), name, geometry: { type: "Polygon", coordinates }, areaHectares, generatedAt: date(area.generatedAt), demo: true };
+  });
+  return { items, demoAreas, sourceStatus, updatedAt: data.updatedAt === null ? null : date(data.updatedAt), lastSuccessAt: source.lastSuccessAt === undefined ? null : date(source.lastSuccessAt), limited: hotspots.length >= 2000 || cases.length >= 200 };
 }
 export function parseCases(body: unknown): CasesData {
   const data = record(body);

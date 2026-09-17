@@ -10,6 +10,10 @@ import { boundPanel, reportDestination, safeWorkspaceDestination } from "./dashb
 assert.equal(reportDestination("?observation=a&panel=old"), "/dashboard?observation=a&panel=report");
 assert.equal(safeWorkspaceDestination("/report?observation=a"), "/dashboard?observation=a&panel=report");
 assert.equal(safeWorkspaceDestination("/dashboard?panel=report"), "/dashboard?panel=report");
+assert.equal(safeWorkspaceDestination("/dashboard", "ADMIN"), "/dashboard");
+assert.equal(safeWorkspaceDestination("/monitoring", "ADMIN"), "/monitoring");
+assert.equal(safeWorkspaceDestination("/monitoring", "USER"), "/dashboard");
+for (const path of ["/report", "/my-reports", "/my-reports/one", "/dashboard?panel=report", "/monitoring?panel=my-reports"]) assert.equal(safeWorkspaceDestination(path, "ADMIN"), "/dashboard");
 for (const path of ["https://evil.invalid", "//evil.invalid", "/dashboard/../evil", "/dashboard\\\\evil", "/dashboard#evil", "/report\n"]) assert.equal(safeWorkspaceDestination(path), "/dashboard");
 for (const viewport of [{ width: 1024, height: 768 }, { width: 1440, height: 900 }, { width: 320, height: 400 }]) {
   for (const box of [{ x: -1000, y: -1000, width: 1, height: 1 }, { x: 9999, y: 9999, width: 9999, height: 9999 }]) {
@@ -21,12 +25,21 @@ for (const viewport of [{ width: 1024, height: 768 }, { width: 1440, height: 900
   }
 }
 
-const draft = { observationTypes: ["SMOKE"], observedLocal: "2025-01-01T10:30", offset: "+08:00", locationMode: "OBSERVER_POSITION", latitude: "", longitude: "", confirmed: true, accuracyMeters: null, regionId: "verified-region", locationDescription: "North of the bridge", description: "Smoke seen across the river" };
+const draft = { observationTypes: ["SMOKE"], observedLocal: "2025-01-01T10:30", timeChoice: "EARLIER", locationMode: "OBSERVER_POSITION", latitude: "", longitude: "", confirmed: true, accuracyMeters: null, regionId: "verified-region", locationDescription: "North of the bridge", description: "Smoke seen across the river" };
 const payload = reportPayload(draft, [], "a-stable-submission-key");
 assert.equal(payload.latitude, null);
 assert.equal(payload.longitude, null);
-assert.equal(payload.observedAt, "2025-01-01T10:30:00+08:00");
-assert.equal(Date.parse(payload.observedAt), Date.parse("2025-01-01T02:30:00Z"));
+assert.equal(payload.observedAt, new Date("2025-01-01T10:30").toISOString());
+assert.equal(Date.parse(payload.observedAt), new Date(2025, 0, 1, 10, 30).getTime());
+const beforeNow = Date.now();
+const nowPayload = reportPayload({ ...draft, timeChoice: "NOW", observedLocal: "" }, [], payload.idempotencyKey);
+assert.ok(Date.parse(nowPayload.observedAt) >= beforeNow && Date.parse(nowPayload.observedAt) <= Date.now());
+for (const locationDescription of ["", "   ", "N"]) {
+  assert.equal(reportPayload({ ...draft, latitude: "0", longitude: "0", locationDescription }, [], payload.idempotencyKey).locationDescription, locationDescription.trim());
+  assert.throws(() => reportPayload({ ...draft, locationDescription }, [], payload.idempotencyKey));
+}
+assert.throws(() => reportPayload({ ...draft, latitude: "0", longitude: "0", locationDescription: "x".repeat(1001) }, [], payload.idempotencyKey));
+assert.equal(reportPayload({ ...draft, latitude: "0", longitude: "0" }, [], payload.idempotencyKey).regionId, null);
 assert.equal("reporterId" in payload, false);
 assert.deepEqual(payload.attachmentIds, []);
 assert.deepEqual(reportPayload(draft, [], payload.idempotencyKey), payload);
@@ -94,8 +107,8 @@ assert.match(reportForm, /if \(pending.current\) return/);
 assert.match(reportForm, /DraftGuard dirty=\{\(dirty && !receipt\) \|\| detailDirty\} pending=\{busy \|\| detailPending\} dashboard/);
 assert.doesNotMatch(reportForm, /localStorage|sessionStorage|<LocationMap/);
 assert.equal((reportForm.match(/<form\b/g) || []).length, 1);
-for (const section of ["Observation", "Location", "Photos"]) assert.match(reportForm, new RegExp(`title="${section}"`));
-assert.match(reportForm, /suffix="Optional"/);
+for (const section of ["Observation", "Location"]) assert.match(reportForm, new RegExp(`<summary[^>]*>${section}`));
+assert.match(reportForm, /Photos \(optional\)/);
 assert.doesNotMatch(reportForm, /photoPreviews\.length === 0|Wajib|required.*photo/i);
 assert.match(reportForm, /useEffect\(\(\) => \(\) => \{ locationRequest.current\+\+; \}, \[open\]\)/);
 assert.match(reportForm, /if \(location \|\| "confirmed" in values\) cancelLocation\(\)/);
@@ -117,6 +130,51 @@ assert.doesNotMatch(reportForm, /rounded-2xl bg-white p-5 shadow-sm/);
 assert.ok(reportForm.indexOf('<DraftGuard') < reportForm.indexOf('<Dialog.Root'));
 assert.doesNotMatch(reportForm, /if \(!open\) return|open && <DraftGuard|localStorage|sessionStorage|querySelector/);
 const reportAST = ts.createSourceFile('ReportPage.tsx', reportForm, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+const initialDeclaration = reportAST.statements.filter(ts.isVariableStatement).flatMap(node => node.declarationList.declarations).find(node => node.name.getText(reportAST) === 'initial');
+const initialDraft = new Function(`return (${initialDeclaration.initializer.getText(reportAST)});`)();
+assert.deepEqual(initialDraft.observationTypes, []);
+for (const field of ['observedLocal', 'latitude', 'longitude', 'regionId', 'description', 'locationDescription']) assert.equal(initialDraft[field], '', `no fabricated ${field}`);
+assert.equal(initialDraft.confirmed, false);
+assert.equal(initialDraft.accuracyMeters, null);
+assert.throws(() => reportPayload(initialDraft, [], 'test-submission-key'));
+for (const change of [{ observedLocal: '' }, { observedLocal: '2025-02-30T10:30' }, { description: '    ' }, { locationDescription: '    ' }, { timeChoice: '' }, { timeChoice: 'INVALID' }]) assert.throws(() => reportPayload({ ...draft, ...change }, [], payload.idempotencyKey));
+assert.equal(reportPayload({ ...draft, regionId: '', latitude: '-1', longitude: '110' }, [], payload.idempotencyKey).regionId, null);
+const disclosures = [];
+function visitReport(node) {
+  if (ts.isJsxElement(node) && node.openingElement.tagName.getText(reportAST) === 'details') disclosures.push(node);
+  ts.forEachChild(node, visitReport);
+}
+visitReport(reportAST);
+assert.equal(disclosures.length, 5);
+for (const disclosure of disclosures) {
+  assert.ok(disclosure.children.some(node => ts.isJsxElement(node) && node.openingElement.tagName.getText(reportAST) === 'summary'));
+  assert.doesNotMatch(disclosure.openingElement.getText(reportAST), /onToggle|key=/);
+  assert.ok(disclosure.children.some(ts.isJsxElement), 'fields stay mounted inside native details');
+}
+const regionDisclosure = disclosures.find(node => node.getText(reportAST).includes('id="region"') && !node.openingElement.getText(reportAST).includes('locationRef'));
+assert.match(regionDisclosure.openingElement.getText(reportAST), /\bopen\b/);
+assert.match(reportForm, /!hasCoordinates && <details/);
+assert.doesNotMatch(reportForm, /observed-zone|draft\.offset|Region \(optional\)/);
+assert.match(reportForm, /draft.timeChoice === "EARLIER" && <label/);
+assert.match(reportForm, /name="observed-time" required/);
+assert.equal(initialDraft.timeChoice, '');
+assert.match(regionDisclosure.getText(reportAST), /required=\{!hasCoordinates\}/);
+assert.match(regionDisclosure.getText(reportAST), /onInvalid=[\s\S]*?details.open = true/);
+for (const disclosure of disclosures.filter(node => node !== regionDisclosure && !/ref=/.test(node.openingElement.getText(reportAST)))) {
+  assert.doesNotMatch(disclosure.openingElement.getText(reportAST), /\bopen=/);
+  assert.doesNotMatch(disclosure.getText(reportAST), /\brequired[\s=>]/);
+}
+assert.match(reportForm, /photos.some\(photo => photo.error\)/);
+assert.match(reportForm, /ref=\{errorRef\} tabIndex=\{-1\} role="alert"/);
+assert.match(reportForm, /requestAnimationFrame\(\(\) => errorRef.current\?\.focus\(\)\)/);
+assert.match(reportForm, /<img src=\{`\/icons8-\$\{icon\}\.png`\} width=\{32\} height=\{32\} alt="" aria-hidden="true" \/>\{label\}/);
+for (const label of ['Smoke', 'Flame', 'Burning smell']) assert.ok(reportForm.includes(`'${label}'`));
+for (const icon of ['smoke', 'flame', 'smell']) {
+  const png = await readFile(new URL(`../../public/icons8-${icon}.png`, import.meta.url));
+  assert.equal(png.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
+  assert.equal(png.readUInt32BE(16), 96);
+  assert.equal(png.readUInt32BE(20), 96);
+}
 const component = reportAST.statements.find(node => ts.isFunctionDeclaration(node) && node.name.text === 'ReportPage');
 const functions = component.body.statements.filter(node => ts.isFunctionDeclaration(node) && ['cancelLocation', 'change', 'locate', 'newReport', 'close'].includes(node.name.text)).map(node => node.getText(reportAST)).join('\n');
 const runReport = new Function('state', ts.transpileModule(`
@@ -195,13 +253,15 @@ assert.match(feed, /Confirm location/);
 assert.match(feed, /open=\{reportOpen && !pick && !feed\}/);
 assert.doesNotMatch(feed, /(?:reportOpen|!feed|!pick) && <ReportPage|<ReportPage[^\n]*\bkey=|Points and clusters do not represent fire boundaries\./);
 assert.doesNotMatch(feed, /Situation overview|records in this view|A hotspot is a thermal anomaly/);
-assert.match(feed, /Hotspot — not a confirmed fire/);
+assert.match(feed, /import \{ ItemDetail \} from "\.\/components\/CitizenDashboard"/);
 assert.match(feed, /min-width: 768px/);
 assert.match(feed, /md:w-\[380px\]/);
 assert.match(feed, /md:max-w-\[600px\]/);
 assert.match(feed, /useState\(72\)/);
 assert.match(feed, /width: 400, height: window.innerHeight - 120/);
-assert.match(feed, /panel === "reports" \? <>/);
+assert.match(feed, /panel === "cases" && !selected \? <GovernmentWorklist/);
+assert.doesNotMatch(feed, /perimeterDraft \? <GovernmentWorklist/);
+assert.match(feed, /user.role === "USER" && pathname === home && <ReportPage/);
 assert.match(feed, /reportOpener.current = event.currentTarget/);
 assert.match(feed, /restoreFocus\(reportOpener.current, '\[data-report-trigger\]'\)/);
 assert.match(feed, /onCloseAutoFocus=\{event => \{ event.preventDefault\(\); restoreFocus\(worklistOpener.current/);
@@ -222,11 +282,18 @@ assert.match(citizenDashboard, /not.*perimeter/i);
 const reportsPanel = await readFile(new URL("../pages/reports/ReportsPage.tsx", import.meta.url), "utf8");
 for (const text of ["Search my reports", "No reports yet", "You haven't submitted any observations."]) assert.ok(reportsPanel.includes(text));
 assert.doesNotMatch(reportsPanel, /voteScore|rating|ThumbsUp|ThumbsDown/);
+assert.match(reportsPanel, /className="grid size-16 place-items-center text-gray-500"/);
 const workspaceNav = await readFile(new URL("../components/common/WorkspaceNav.tsx", import.meta.url), "utf8");
 assert.match(workspaceNav, /max-w-5xl/);
 assert.doesNotMatch(workspaceNav.match(/<header[^>]+>/)[0], /\bborder\b/);
 const accountMenu = await readFile(new URL("../components/auth/AccountMenu.tsx", import.meta.url), "utf8");
 assert.match(accountMenu, /rounded-full border-0 bg-transparent/);
+assert.match(accountMenu, /hover:bg-secondary focus-visible:bg-secondary data-\[state=open\]:bg-secondary/);
+assert.match(accountMenu, /to="\/profile"/);
+assert.match(accountMenu, /user.role === "ADMIN" && <DropdownMenu.Item/);
+assert.doesNotMatch(workspaceNav, /user.role === "USER" && <nav/);
+assert.match(feed, /aria-label="Feed visibility"/);
+assert.match(feed, /<DraftGuard dirty=\{!!perimeterDraft\} pending=\{!!perimeterDraft\?\.pending\}/);
 const mobileSheet = await readFile(new URL("../hooks/useMobileSheetResize.ts", import.meta.url), "utf8");
 assert.match(mobileSheet, /pointermove/);
 assert.match(mobileSheet, /event\.isPrimary/);
@@ -306,8 +373,7 @@ for (const scenario of ['same-url', 'search', 'forced', 'action', 'changed-user'
   const checked = scenario === 'changed-user' ? { ...current, id: 'b' } : scenario === 'changed-role' ? { ...current, role: 'ADMIN' } : current;
   const load = runLoader(async () => { checks++; if (scenario === 'expired') throw new SessionError(); if (scenario === 'unavailable') throw new Error(); return checked; }, () => clears++, { getQueriesData: () => [[['dashboard', 'a', 'USER', 'guard'], current]] }, { dashboard: { all: ['dashboard'] } }, SessionError, value => new globalThis.Response(null, { status: 302, headers: { Location: value } }));
   const result = load({ request: new globalThis.Request('https://example.invalid/dashboard') });
-  if (scenario === 'changed-role') await assert.rejects(result, error => error.status === 302 && error.headers.get('Location') === '/monitoring');
-  else if (['expired', 'unavailable'].includes(scenario)) await assert.rejects(result);
+  if (['expired', 'unavailable'].includes(scenario)) await assert.rejects(result);
   else assert.deepEqual(await result, checked);
   assert.equal(checks, 1, `session check: ${scenario}`);
   assert.equal(clears, ['changed-user', 'changed-role', 'expired', 'unavailable'].includes(scenario) ? 1 : 0, `draft cache: ${scenario}`);
@@ -341,11 +407,12 @@ const flame = await readFile(new URL("../pages/dashboard/components/SituationMap
 assert.match(flame, /item\.kind !== "publication" \|\| item\.verification !== "CONFIRMED_FIRE"/);
 assert.match(flame, /motion-safe:animate-pulse/);
 assert.match(flame, /AttributionControl\(\{ compact: true \}\)/);
-assert.match(flame, /draggable: true/);
+assert.match(flame, /draggable: !!onPick/);
+assert.match(flame, /marker\.setDraggable\(!!onPick\)/);
 assert.match(flame, /marker\.on\("dragend"/);
 assert.match(flame, /use arrow keys to adjust/);
 assert.match(flame, /element\.addEventListener\("click", event => event\.stopPropagation\(\)\)/);
-assert.match(flame, /element\.tabIndex = 0/);
+assert.match(flame, /element\.tabIndex = onPick \? 0 : -1/);
 assert.match(flame, /element\.addEventListener\("keydown"/);
 assert.match(flame, /ArrowUp.*ArrowDown.*ArrowLeft.*ArrowRight/);
 const mapSource = await readFile(new URL("../config/map.ts", import.meta.url), "utf8");

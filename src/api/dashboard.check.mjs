@@ -16,16 +16,16 @@ assert.equal(parsed.items[0].latitude, null);
 assert.equal(toGeoJSON(parsed.items).features.length, 0);
 assert.equal(JSON.stringify(parsed).includes("reporterEmail"), false);
 assert.equal(parsed.sourceStatus, "NOT_SYNCED");
-assert.equal(mapAvailability(parsed, false), "Satellite data is temporarily unavailable.");
+assert.equal(mapAvailability(parsed, false), "Satellite data is not up to date. No successful sync recorded.");
 assert.equal(mapAvailability(null, false), "");
-assert.match(mapAvailability(null, true), /unavailable/);
-assert.match(mapAvailability(parsed, true), /earlier results/);
+assert.match(mapAvailability(null, true), /could not load/);
+assert.match(mapAvailability(parsed, true), /not up to date/);
 assert.equal(mapAvailability({ ...parsed, sourceStatus: "AVAILABLE" }, false), "");
-assert.match(mapAvailability({ ...parsed, sourceStatus: "STALE" }, false), /out of date/);
+assert.match(mapAvailability({ ...parsed, sourceStatus: "STALE" }, false), /not up to date/);
 for (const sourceStatus of ["UNAVAILABLE", "NOT_CONFIGURED", "NOT_SYNCED"]) {
-  assert.equal(mapAvailability({ ...parsed, sourceStatus }, false), "Satellite data is temporarily unavailable.");
+  assert.equal(mapAvailability({ ...parsed, sourceStatus }, false), `${sourceStatus === "NOT_CONFIGURED" ? "Satellite source is not configured." : "Satellite data is not up to date."} No successful sync recorded.`);
 }
-assert.equal(dashboardLogin("ADMIN"), "/login?next=%2Fmonitoring&portal=government");
+assert.equal(dashboardLogin("ADMIN"), "/login?next=%2Fdashboard&portal=government");
 assert.equal(dashboardLogin("USER"), "/login?next=%2Fdashboard");
 assert.equal(sameDashboardAccount({ id: "a", role: "ADMIN" }, { id: "a", role: "ADMIN" }), true);
 assert.equal(sameDashboardAccount({ id: "a", role: "ADMIN" }, { id: "b", role: "ADMIN" }), false);
@@ -46,9 +46,17 @@ assert.equal(filterMap(parsed.items, "TEST REGION", true, false).length, 1);
 assert.equal(filterMap(parsed.items, "", false, true).length, 0);
 const approved = parseMap({ data: { ...response.data, cases: [{ ...publication, publicLocationMode: "APPROVED_INCIDENT_POINT", latitude: 0, longitude: 0 }] } });
 assert.deepEqual(toGeoJSON(approved.items).features[0].geometry.coordinates, [0, 0]);
-assert.deepEqual(Object.keys(toGeoJSON(approved.items).features[0].properties).sort(), ["id", "kind"]);
+assert.deepEqual(Object.keys(toGeoJSON(approved.items).features[0].properties).sort(), ["flameSize", "id", "kind"]);
 assert.throws(() => parseMap({ data: { ...response.data, cases: [{ ...publication, publicLocationMode: "APPROVED_INCIDENT_POINT", latitude: 200 }] } }));
 assert.throws(() => parseMap({ data: { ...response.data, cases: [{ ...publication, verificationStatus: "AI_CONFIRMED" }] } }));
+
+const demoArea = { id: "demo-1", name: "[DEMO] Test area", demo: true, areaHectares: 31.13, generatedAt: publication.publishedAt, geometry: { type: "Polygon", coordinates: [[[113.8, -2.5], [113.806, -2.5], [113.806, -2.4958], [113.8, -2.5]]] } };
+const withAreas = parseMap({ data: { ...response.data, demoAreas: [demoArea] } });
+assert.deepEqual(withAreas.demoAreas, [demoArea]);
+assert.deepEqual(parsed.demoAreas, []);
+for (const invalid of [{ ...demoArea, demo: false }, { ...demoArea, name: "Real fire" }, { ...demoArea, areaHectares: -1 }, { ...demoArea, geometry: { type: "Point", coordinates: [113, -2] } }, { ...demoArea, geometry: { type: "Polygon", coordinates: [[[113, -2], [114, -2], [114, -1], [113, -1]]] } }]) {
+  assert.throws(() => parseMap({ data: { ...response.data, demoAreas: [invalid] } }));
+}
 
 const mapSource = await readFile(new URL("../pages/dashboard/components/SituationMap.tsx", import.meta.url), "utf8");
 const containerTag = mapSource.match(/<div ref=\{container\}[^>]+>/)[0];

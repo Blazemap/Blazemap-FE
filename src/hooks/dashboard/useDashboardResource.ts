@@ -5,7 +5,7 @@ import { AuthError, dashboardLogin } from "@/lib";
 import type { CaseFilters, DashboardUser } from "@/types";
 import { checkDashboardAccount, clearDashboardQueries } from "./session";
 
-function useDashboardResource<T>(user: DashboardUser, queryKey: QueryKey, load: (context: { signal: AbortSignal }) => Promise<T>, polling = false, enabled = true) {
+export function useDashboardResource<T>(user: DashboardUser, queryKey: QueryKey, load: (context: { signal: AbortSignal }) => Promise<T>, polling = false, enabled = true) {
   const query = useQuery({
     queryKey,
     enabled,
@@ -28,9 +28,12 @@ function useDashboardResource<T>(user: DashboardUser, queryKey: QueryKey, load: 
     refetchInterval: polling ? (current) => current.state.fetchStatus === "fetching" ? false : dashboardRefreshMs : false,
   });
   const forbidden = query.data === null || (query.error instanceof AuthError && query.error.status === 401);
+  const data = forbidden ? null : query.data ?? null;
   return {
-    data: forbidden ? null : query.data ?? null,
-    loading: query.isFetching || query.isLoading,
+    data,
+    loading: query.isFetching,
+    initialLoading: query.isPending && !data,
+    refreshing: query.isFetching && !!data,
     failed: query.isError || forbidden,
     forbidden,
     receivedAt: query.dataUpdatedAt && query.data !== null ? new Date(query.dataUpdatedAt).toISOString() : null,

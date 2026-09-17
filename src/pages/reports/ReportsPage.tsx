@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Flame, Search, Send, X } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { ArrowLeft, ArrowUpRight, Flame, Search, Send, X } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { downloadPhoto } from "@/api/reports";
 import { Button } from "@/components/ui";
 import { useMutationAddReportUpdate, useQueryGetReport, useQueryGetReports } from "@/hooks/reports";
 import { privateError } from "@/lib";
-import type { DashboardUser } from "@/types";
+import type { DashboardUser, OwnReport } from "@/types";
 
 const statusLabels = { NEW: "Received", NEEDS_DETAILS: "More details requested", REVIEWED: "Reviewed" };
 function time(value: string) { return `${new Date(value).toLocaleString("en-GB", { timeZone: "UTC" })} UTC`; }
@@ -26,7 +26,61 @@ function ReportDetailSkeleton() {
   return <div role="status" aria-label="Loading report details" className="animate-pulse px-7 py-6"><span className="sr-only">Loading report details</span><div className="flex justify-between gap-4"><span className="h-6 w-36 rounded-full bg-secondary" /><span className="size-11 rounded-sm bg-secondary" /></div>{Array.from({ length: 4 }, (_, index) => <div key={index} className="border-b border-primary/10 py-5"><span className="block h-2.5 w-28 rounded-full bg-secondary/80" /><span className="mt-3 block h-3 w-4/5 rounded-full bg-secondary" /></div>)}</div>;
 }
 
+function ReportSearch({ reports, query, initialLoading, onQueryChange, onSelect }: { reports: OwnReport[]; query: string; initialLoading: boolean; onQueryChange: (query: string) => void; onSelect: (report: OwnReport) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listId = `my-reports-${useId().replaceAll(":", "")}-results`;
+  const [focused, setFocused] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+  const [highlighted, setHighlighted] = useState(-1);
+  const hasQuery = !!query.trim();
+  const results = hasQuery ? reports.slice(0, 6) : [];
+  const activeIndex = highlighted < 0 ? -1 : Math.min(highlighted, results.length - 1);
+  const open = focused && hasQuery && !dismissed;
+
+  function select(report: OwnReport) {
+    onSelect(report);
+    setDismissed(true);
+    inputRef.current?.blur();
+  }
+  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Escape" && open) {
+      event.preventDefault();
+      setDismissed(true);
+      return;
+    }
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      if (!hasQuery) return;
+      event.preventDefault();
+      setDismissed(false);
+      setHighlighted(current => event.key === "ArrowDown" ? Math.min(current + 1, Math.max(results.length - 1, 0)) : current < 0 ? Math.max(results.length - 1, 0) : Math.max(current - 1, 0));
+      return;
+    }
+    if (event.key === "Enter" && open && results[activeIndex]) {
+      event.preventDefault();
+      select(results[activeIndex]);
+    }
+  }
+
+  return <div className="relative" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false); }}>
+    <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-primary" aria-hidden="true" />
+    <label htmlFor="my-reports-search" className="sr-only">Search my reports</label>
+    <input ref={inputRef} id="my-reports-search" type="search" role="combobox" aria-autocomplete="list" aria-expanded={open} aria-controls={open ? listId : undefined} aria-activedescendant={open && activeIndex >= 0 ? `${listId}-${activeIndex}` : undefined} autoComplete="off" maxLength={200} value={query} onFocus={() => { setFocused(true); setDismissed(false); }} onKeyDown={handleKeyDown} onChange={event => { onQueryChange(event.target.value); setHighlighted(-1); setDismissed(false); }} placeholder="Search my reports" className="h-10 w-full rounded-sm border-0 bg-[#eef3e9] pl-10 pr-3 text-sm font-semibold outline-none transition focus:bg-white focus:ring-2 focus:ring-primary/15" />
+    {open && <div className="absolute left-0 top-full z-[90] mt-2 w-full overflow-hidden rounded-sm border border-primary/10 bg-white shadow-2xl">
+      <div id={listId} role="listbox" aria-label="Matching reports" aria-busy={initialLoading} className="max-h-[min(24rem,60dvh)] overflow-y-auto p-1.5">
+        {initialLoading ? <ReportSearchSkeleton /> : <>{results.map((report, index) => <button key={report.id} id={`${listId}-${index}`} type="button" role="option" aria-selected={index === activeIndex} tabIndex={-1} onMouseDown={event => event.preventDefault()} onMouseEnter={() => setHighlighted(index)} onClick={() => select(report)} className="flex min-h-[76px] w-full items-center gap-3 rounded-sm px-3 py-2 text-left outline-none hover:bg-secondary/45 aria-selected:bg-secondary/70"><span className="min-w-0 flex-1"><span className="block break-all text-sm font-extrabold">{report.number}</span><span className="mt-1 block truncate text-xs text-muted-foreground">{report.locationDescription}</span><span className="mt-1 block text-[10px] font-semibold text-primary">{statusLabels[report.reviewStatus]}</span></span><ArrowUpRight size={16} className="shrink-0 text-primary" aria-hidden="true" /></button>)}
+        {!results.length && <p role="status" className="px-4 py-6 text-center text-xs font-bold text-muted-foreground">No loaded reports match.</p>}</>}
+      </div>
+    </div>}
+  </div>;
+}
+
+function ReportSearchSkeleton() {
+  return <div role="status" aria-label="Loading matching reports" className="space-y-1 p-1.5 motion-safe:animate-pulse"><span className="sr-only">Loading matching reports</span>{Array.from({ length: 3 }, (_, index) => <div key={index} className="flex min-h-[76px] items-center gap-3 rounded-sm px-3 py-2"><span className="min-w-0 flex-1"><span className="block h-3 w-2/3 rounded-full bg-secondary" /><span className="mt-2 block h-2.5 w-4/5 rounded-full bg-secondary/80" /><span className="mt-2 block h-2 w-24 rounded-full bg-secondary/70" /></span><span className="size-4 shrink-0 rounded bg-secondary" /></div>)}</div>;
+}
+
 function ReportList({ user, onClose }: { user: DashboardUser; onClose?: () => void }) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const query = useQueryGetReports(user, page);
@@ -38,12 +92,12 @@ function ReportList({ user, onClose }: { user: DashboardUser; onClose?: () => vo
 
   return <div className="flex min-h-0 flex-1 flex-col bg-white">
     <PanelHeader count={total} loading={query.isPending} onClose={onClose} />
-    <div className="shrink-0 border-b border-primary/10 bg-white px-5 py-3"><div className="relative"><Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-primary" aria-hidden="true" /><label htmlFor="my-reports-search" className="sr-only">Search my reports</label><input id="my-reports-search" type="search" maxLength={200} value={search} onChange={event => setSearch(event.target.value)} placeholder="Search my reports" className="h-10 w-full rounded-sm border-0 bg-[#eef3e9] pl-10 pr-3 text-sm font-semibold outline-none transition focus:bg-white focus:ring-2 focus:ring-primary/15" /></div></div>
-    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-[#eef3e9]">
+    <div className="shrink-0 border-b border-primary/10 bg-white px-5 py-3"><ReportSearch reports={reports} query={search} initialLoading={query.isPending && !query.data} onQueryChange={setSearch} onSelect={report => { const params = new URLSearchParams(location.search); params.set("panel", "my-reports"); params.set("report", report.id); navigate(`${location.pathname}?${params}`, { replace: true }); }} /></div>
+    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-white">
       {query.isPending && <ReportListSkeleton />}
       {query.isError && <div role="alert" className="p-6 text-sm"><p>{privateError(query.error)}</p><Button className="mt-3 rounded-sm" variant="outline" onClick={() => void query.refetch()}>Retry</Button></div>}
       {!query.isError && query.data && reports.length > 0 && <ul className="divide-y divide-primary/10 bg-white">{reports.map(report => <li key={report.id}><Link className="block px-5 py-4 transition-colors hover:bg-secondary/40" to={`/dashboard?panel=my-reports&report=${encodeURIComponent(report.id)}`}><div className="flex items-start justify-between gap-3"><span className="rounded-full bg-secondary px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-widest text-primary">{statusLabels[report.reviewStatus]}</span><time dateTime={report.createdAt} className="text-[10px] font-semibold text-muted-foreground">{new Date(report.createdAt).toLocaleDateString("en-GB")}</time></div><h3 className="mt-3 break-all text-sm font-extrabold">{report.number}</h3><p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{report.locationDescription}</p></Link></li>)}</ul>}
-      {!query.isError && query.data && reports.length === 0 && <div className="flex h-full min-h-64 flex-col items-center justify-center px-8 pb-16 text-center"><span className="grid size-16 place-items-center rounded-full bg-secondary text-primary/55"><Flame size={30} strokeWidth={1.8} aria-hidden="true" /></span><h3 className="mt-4 font-extrabold text-forest/75">{total === 0 ? "No reports yet" : "No matching reports"}</h3><p className="mt-1 max-w-64 text-sm leading-6 text-muted-foreground">{total === 0 ? "You haven't submitted any observations." : "Try another search."}</p></div>}
+      {!query.isError && query.data && reports.length === 0 && <div className="flex h-full min-h-64 flex-col items-center justify-center px-8 pb-16 text-center"><span className="grid size-16 place-items-center text-gray-500"><Flame size={30} strokeWidth={1.8} aria-hidden="true" /></span><h3 className="mt-4 font-extrabold text-gray-500">{total === 0 ? "No reports yet" : "No matching reports"}</h3><p className="mt-1 max-w-64 text-sm leading-6 text-gray-500">{total === 0 ? "You haven't submitted any observations." : "Try another search."}</p></div>}
     </div>
     {query.data && total > query.data.meta.pageSize && <div className="flex shrink-0 items-center justify-between border-t border-primary/10 bg-white p-4"><Button variant="outline" className="rounded-sm" disabled={page <= 1} onClick={() => setPage(value => value - 1)}>Previous</Button><span className="text-xs font-bold text-muted-foreground">Page {page}</span><Button variant="outline" className="rounded-sm" disabled={page * query.data.meta.pageSize >= total} onClick={() => setPage(value => value + 1)}>Next</Button></div>}
   </div>;

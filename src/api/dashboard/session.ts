@@ -41,7 +41,7 @@ export async function getDashboardUser(signal: AbortSignal): Promise<DashboardUs
   if (!user.active || Date.parse(session.expiresAt) <= Date.now()) throw new AuthError("SESSION_REQUIRED", 401);
   if (!user.emailVerified) throw new AuthError("EMAIL_NOT_VERIFIED", 403);
   const image = uploadedAvatar(user.image) ? user.image : googleAvatar(user.image);
-  return { id: user.id, name: user.name, email: user.email, image, role: user.role as DashboardUser["role"], canConfirmIncidents: user.canConfirmIncidents === true };
+  return { id: user.id, name: user.name, email: user.email, image, role: user.role as DashboardUser["role"], canConfirmIncidents: user.canConfirmIncidents === true, canPublishInformation: user.canPublishInformation === true };
 }
 export async function getSharedAccount(fresh = false): Promise<DashboardUser> {
   const current = await queryClient.fetchQuery(fresh ? { ...accountQueryOptions, staleTime: 0 } : accountQueryOptions);

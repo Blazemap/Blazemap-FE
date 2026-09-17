@@ -20,10 +20,10 @@ assert.deepEqual(avatarDimensions(png, 'image/png'), { width: 512, height: 512 }
 header.setUint32(16, 100000);
 assert.throws(() => avatarDimensions(png, 'image/png'));
 assert.throws(() => avatarDimensions(new Uint8Array(0), 'image/jpeg'));
-assert.equal(workspacePath('ADMIN'), '/monitoring');
-assert.equal(safeWorkspaceDestination('/dashboard?panel=report&observation=a', 'ADMIN'), '/monitoring?panel=report&observation=a');
+assert.equal(workspacePath('ADMIN'), '/dashboard');
+assert.equal(safeWorkspaceDestination('/dashboard?panel=report&observation=a', 'ADMIN'), '/dashboard');
 assert.equal(safeWorkspaceDestination('/monitoring?role=ADMIN', 'USER'), '/dashboard');
-assert.equal(safeWorkspaceDestination('//evil.invalid', 'ADMIN'), '/monitoring');
+assert.equal(safeWorkspaceDestination('//evil.invalid', 'ADMIN'), '/dashboard');
 const provider = 'https://lh3.googleusercontent.com/a/avatar';
 assert.equal(googleAvatar(provider), provider);
 assert.equal(googleAvatar('https://googleusercontent.com/avatar'), 'https://googleusercontent.com/avatar');

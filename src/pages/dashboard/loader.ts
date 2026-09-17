@@ -14,7 +14,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     if (queryClient.getQueriesData({ queryKey: queryKeys.dashboard.all }).some(([key]) => key[1] !== user.id || key[2] !== user.role)) clearDashboardQueries();
     const url = new URL(request.url);
     if (url.pathname === "/monitoring" && user.role !== "ADMIN") throw redirect("/dashboard");
-    if (url.pathname === "/dashboard" && user.role === "ADMIN") throw redirect(`${workspacePath(user.role)}${url.search}`);
+    if (user.role === "ADMIN" && (url.pathname === "/report" || url.pathname.startsWith("/my-reports") || ["report", "my-reports"].includes(url.searchParams.get("panel") ?? ""))) throw redirect(workspacePath(user.role));
     return user;
   } catch (error) {
     request.signal.throwIfAborted();

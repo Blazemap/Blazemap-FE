@@ -1,7 +1,8 @@
 import type { DashboardUser } from "@/types";
 
 export function workspacePath(role: DashboardUser["role"]): string {
-  return role === "ADMIN" ? "/monitoring" : "/dashboard";
+  void role;
+  return "/dashboard";
 }
 export function dashboardLogin(role: DashboardUser["role"]): string {
   return `/login?next=${encodeURIComponent(workspacePath(role))}${role === "ADMIN" ? "&portal=government" : ""}`;
@@ -19,7 +20,8 @@ export function safeWorkspaceDestination(next: string, role: DashboardUser["role
   const path = index < 0 ? next : next.slice(0, index);
   const search = index < 0 ? "" : next.slice(index + 1);
   if (path === "/monitoring" && role !== "ADMIN") return home;
-  if (path === "/dashboard" || path === "/monitoring") return `${home}${search ? `?${search}` : ""}`;
+  if (role === "ADMIN" && (path === "/report" || path.startsWith("/my-reports") || ["report", "my-reports"].includes(new URLSearchParams(search).get("panel") ?? ""))) return home;
+  if (path === "/dashboard" || path === "/monitoring") return `${path}${search ? `?${search}` : ""}`;
   if (path === "/report") return reportDestination(search).replace("/dashboard", home);
   return next;
 }

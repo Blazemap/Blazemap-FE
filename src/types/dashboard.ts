@@ -1,4 +1,4 @@
-export type DashboardUser = { id: string; name: string; email: string; image?: string; role: "USER" | "ADMIN"; canConfirmIncidents?: boolean };
+export type DashboardUser = { id: string; name: string; email: string; image?: string; role: "USER" | "ADMIN"; canConfirmIncidents?: boolean; canPublishInformation?: boolean };
 export type Verification = "UNVERIFIED" | "CONFIRMED_FIRE" | "NOT_FIRE";
 export type Handling = "OPEN" | "CHECK_SCHEDULED" | "ON_SCENE" | "RESPONDING" | "MONITORING" | "CLOSED";
 export type Priority = "HIGH" | "MEDIUM" | "LOW" | "UNASSESSED";
@@ -11,6 +11,8 @@ export type MapItem = {
   time: string;
   source: string;
   location: string;
+  publicLocationMode?: "NONE" | "REGION_ONLY" | "APPROVED_INCIDENT_POINT" | "APPROVED_INCIDENT_PERIMETER";
+  publicPerimeter?: import("@/lib/perimeter").PublicPerimeter;
   verification?: Verification;
   handling?: Handling;
   product?: string;
@@ -20,8 +22,10 @@ export type MapItem = {
   fetchedAt?: string;
   stale: boolean;
 };
+export type DemoArea = { id: string; name: string; geometry: { type: "Polygon"; coordinates: [number, number][][] }; areaHectares: number; generatedAt: string; demo: true };
 export type MapData = {
   items: MapItem[];
+  demoAreas?: DemoArea[];
   updatedAt: string | null;
   sourceStatus: "AVAILABLE" | "STALE" | "NOT_CONFIGURED" | "NOT_SYNCED" | "UNAVAILABLE";
   lastSuccessAt: string | null;

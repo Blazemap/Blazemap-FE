@@ -36,6 +36,8 @@ try {
   const results = await Promise.all(Array.from({ length: 20 }, () => client.fetchQuery(accountQueryOptions)));
   assert.equal(calls, 1);
   assert.equal(results[0].image, user.image);
+  assert.equal(results[0].canPublishInformation, false);
+  assert.equal(results[0].canConfirmIncidents, false);
   for (let step = 0; step < 11; step++) { clock += 5000; await client.fetchQuery(accountQueryOptions); }
   assert.equal(calls, 1, 'five-second resource checks reuse the shared fresh session');
   clock += 5001;
