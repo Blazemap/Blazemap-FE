@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { motion, useAnimationControls } from "framer-motion";
-import { CheckCircle, Eye, EyeOff, LoaderCircle } from "lucide-react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Eye, EyeOff, LoaderCircle } from "lucide-react";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui";
 import { useAuth, useMotionPreference } from "@/hooks";
 import type { AuthField, AuthMode, AuthPortal } from "@/lib";
+import { safeWorkspaceDestination } from "@/lib/dashboard";
 
 function AuthInput({ name, label, type = "text", autoComplete, error, attempt, helper, onChange }: {
   name: AuthField;
@@ -66,7 +67,7 @@ function GoogleMark() {
 }
 
 export function AuthForm({ mode, portal = "citizen" }: { mode: AuthMode; portal?: AuthPortal }) {
-  const { phase, isPending, error, notice, fieldErrors, attempt, googleState, submit, startGoogle, resend, reset, clearFieldError, verificationEmail } = useAuth(mode, portal);
+  const { role, phase, isPending, error, notice, fieldErrors, attempt, googleState, submit, startGoogle, resend, reset, clearFieldError, verificationEmail } = useAuth(mode, portal);
   const [params] = useSearchParams();
   const formRef = useRef<HTMLFormElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -76,7 +77,7 @@ export function AuthForm({ mode, portal = "citizen" }: { mode: AuthMode; portal?
   const isRegister = mode === "register";
   const isGovernment = portal === "government";
   const loginPath = isGovernment ? "/login?portal=government" : "/login";
-  const heading = phase === "checking" ? "Confirming your login" : phase === "success" ? "You’re logged in" : phase === "verification" ? "Check your email" : isRegister ? "Create an account" : isGovernment ? "Government Login" : "Welcome back";
+  const heading = phase === "checking" ? "Confirming your login" : phase === "verification" ? "Check your email" : isRegister ? "Create an account" : isGovernment ? "Government Login" : "Welcome back";
   const verificationError = params.has("error") && params.get("oauth") !== "google"
     ? "The verification link is invalid or expired. Login to request a new one."
     : "";
@@ -112,16 +113,20 @@ export function AuthForm({ mode, portal = "citizen" }: { mode: AuthMode; portal?
     if (field === "password") clearFieldError("confirmPassword");
   }
 
+  if (phase === "success" && role) {
+    const next = params.get("next") ?? "";
+    const destination = safeWorkspaceDestination(next, role);
+    return <Navigate to={destination} replace />;
+  }
+
   return (
     <section aria-labelledby="auth-heading" className="auth-form">
-      {phase === "success" && <CheckCircle aria-hidden="true" className="mb-4 size-11 text-primary" strokeWidth={1.5} />}
       <h1 id="auth-heading" ref={headingRef} tabIndex={-1} className="text-[clamp(28px,3vw,38px)] font-extrabold leading-[1.12] tracking-[-0.035em]">{heading}</h1>
       {phase === "form" && <p className="mt-2 text-sm leading-6 text-muted-foreground">{isGovernment ? "For authorized government accounts only." : isRegister ? "Register as a citizen to get started." : "Login to your Blazemap account."}</p>}
-      {phase === "success" && <p className="mt-3 text-sm leading-6 text-muted-foreground">{isGovernment ? "Your government account is authenticated." : "Your citizen account is authenticated."}</p>}
       {phase === "checking" && <div role="status" className="mt-6 flex items-center gap-3 text-sm text-muted-foreground"><LoaderCircle size={20} aria-hidden="true" className="motion-safe:animate-spin" />Verifying your account and access.</div>}
       {phase === "verification" && <><p className="mt-4 break-words text-sm font-bold">{verificationEmail}</p><p className="mt-3 text-sm leading-6 text-muted-foreground">{isRegister ? "If this address can be registered, check your inbox and spam folder for a verification link. Verify your email before logging in." : "Verify your email before logging in. Check your inbox and spam folder, or request a new link."}</p></>}
       {phase === "form" && (verificationError || verificationNotice) && <p className={`mt-3 text-xs leading-5 ${verificationError ? "text-red-700" : "text-muted-foreground"}`}>{verificationError || verificationNotice}</p>}
-      <p ref={errorRef} role="alert" tabIndex={-1} className={error ? "mt-3 rounded-lg border border-red-700/20 bg-red-50 px-3 py-2 text-sm leading-5 text-red-800" : "sr-only"}>{error}</p>
+      <p ref={errorRef} role="alert" tabIndex={-1} className={error ? "mt-3 text-sm leading-5 text-red-800" : "sr-only"}>{error}</p>
       <p role="status" className={notice ? "mt-3 text-sm leading-6 text-primary" : "sr-only"}>{notice}</p>
       {phase === "form" && (
         <>
@@ -149,7 +154,6 @@ export function AuthForm({ mode, portal = "citizen" }: { mode: AuthMode; portal?
         </>
       )}
       {phase === "verification" && <><fieldset disabled={isPending} className="mt-6 min-w-0 space-y-3"><legend className="sr-only">Email verification</legend><Button type="button" onClick={() => { void resend(); }} className="min-h-11 w-full font-bold">{isPending ? "Requesting link…" : "Resend verification email"}</Button><Button type="button" variant="outline" onClick={reset} className="min-h-11 w-full font-bold">Change details</Button></fieldset><Link to={loginPath} className="mt-3 inline-flex min-h-11 items-center text-sm font-bold text-primary underline underline-offset-4">Login</Link></>}
-      {phase === "success" && <Button asChild className="mt-6 min-h-12 w-full font-bold"><a href="/">Back to home</a></Button>}
     </section>
   );
 }

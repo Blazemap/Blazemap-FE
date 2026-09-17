@@ -1,0 +1,40 @@
+export type ObservationType = "SMOKE" | "FLAME" | "BURNING_SMELL";
+export type ReportDraft = {
+  observationTypes: ObservationType[];
+  observedLocal: string;
+  offset: "+07:00" | "+08:00";
+  locationMode: "INCIDENT_ESTIMATE" | "OBSERVER_POSITION";
+  latitude: string;
+  longitude: string;
+  confirmed: boolean;
+  accuracyMeters: number | null;
+  regionId: string;
+  locationDescription: string;
+  description: string;
+};
+export type ReportPayload = {
+  observationTypes: ObservationType[];
+  observedAt: string;
+  locationMode: ReportDraft["locationMode"];
+  latitude: number | null;
+  longitude: number | null;
+  accuracyMeters: number | null;
+  regionId: string | null;
+  locationDescription: string;
+  description: string;
+  attachmentIds: string[];
+  idempotencyKey: string;
+};
+export type Region = { id: string; name: string; timezone: string; code: string; level: number };
+export type OwnReport = {
+  id: string; number: string; observationTypes: ObservationType[]; observedAt: string; createdAt: string;
+  locationMode: ReportDraft["locationMode"]; latitude: number | null; longitude: number | null;
+  accuracyMeters: number | null; locationDescription: string; description: string;
+  reviewStatus: "NEW" | "NEEDS_DETAILS" | "REVIEWED";
+  region: { id: string; name: string; timezone: string } | null;
+  case: { number: string; verificationStatus: string; handlingStatus: string } | null;
+  attachments: { id: string; filename: string; size: number; contentType: string }[];
+  updates?: { id: string; message: string; kind: string; authorRole: string; createdAt: string }[];
+};
+export type ReportList = { data: OwnReport[]; meta: { total: number; page: number; pageSize: number } };
+export type ReportPhoto = { file: File; preview: string; id?: string; intentId?: string; uploaded?: boolean; progress: number; error?: string };

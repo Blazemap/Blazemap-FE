@@ -1,18 +1,31 @@
 import { useEffect, useRef, useState } from "react";
 import { MotionConfig } from "framer-motion";
-import { Building2, LogIn, Menu, Sprout, X } from "lucide-react";
+import { Building2, LogIn, Menu, X } from "lucide-react";
+import { Brand } from "@/components/common";
 import { Outlet, useLocation } from "react-router-dom";
+import type { DashboardUser } from "@/types";
+import { dashboardLogin, sameDashboardAccount } from "@/lib";
+import { workspacePath } from "@/lib/dashboard";
 import SmoothScroll from "./SmoothScroll";
 import { Button } from "@/components/ui";
-import { useMotionPreference } from "@/hooks";
+import { useAccount, useMotionPreference } from "@/hooks";
+import { AccountMenu } from "@/components/auth";
 
 const links = [
   { label: "Home", href: "/" },
   { label: "Contact", href: "/contact" },
 ];
 
-export default function MainLayout() {
+export default function MainLayout({ accountUser }: { accountUser?: DashboardUser } = {}) {
   const { pathname } = useLocation();
+  const account = useAccount();
+  const user = accountUser ?? (account.isError ? null : account.data);
+  const isGuest = !accountUser && account.isSuccess && account.data === null;
+  useEffect(() => {
+    if (!accountUser || account.isPending || account.isError) return;
+    const current = account.data;
+    if (!current || !sameDashboardAccount(accountUser, current)) window.location.replace(current ? workspacePath(current.role) : dashboardLogin(accountUser.role));
+  }, [account.data, account.isError, account.isPending, accountUser]);
   const [isMenuOpen, setMenuOpen] = useState(false);
   const isReducedMotion = useMotionPreference();
   const menuButtonRef = useRef<HTMLButtonElement>(null);
@@ -20,7 +33,7 @@ export default function MainLayout() {
   const activePath = pathname.replace(/\/+$/, "") || "/";
 
   useEffect(() => {
-    const title = activePath === "/contact" ? "Contact — Blazemap" : "Blazemap — Forest & land fire awareness";
+    const title = accountUser ? "Account settings — Blazemap" : activePath === "/contact" ? "Contact — Blazemap" : "Blazemap — Forest & land fire awareness";
     const description = activePath === "/contact"
       ? "Contact information for Blazemap, public channel availability, and guidance for forest and land fire observations in Kalimantan."
       : "Get to know Blazemap: forest and land fire awareness for Kalimantan, community observations, human verification, and guidance for staying safe.";
@@ -28,7 +41,7 @@ export default function MainLayout() {
     document.querySelector('meta[name="description"]')?.setAttribute("content", description);
     document.querySelector('meta[property="og:title"]')?.setAttribute("content", title);
     document.querySelector('meta[property="og:description"]')?.setAttribute("content", description);
-  }, [activePath]);
+  }, [activePath, accountUser]);
 
   useEffect(() => {
     if (!isMenuOpen) return;
@@ -59,17 +72,14 @@ export default function MainLayout() {
 
   return (
     <MotionConfig reducedMotion={isReducedMotion ? "always" : "never"}>
-      <SmoothScroll />
+      {!accountUser && <SmoothScroll />}
       <div className="flex min-h-dvh w-full flex-col bg-background text-foreground">
         <a href="#main-content" className="sr-only z-50 rounded-md bg-forest px-5 py-3 font-bold text-background focus:not-sr-only focus:fixed focus:left-6 focus:top-4">
           Skip to content
         </a>
         <header ref={headerRef} className="relative z-30 bg-background">
-          <div className="mx-auto flex h-20 max-w-[1440px] items-center justify-between gap-8 px-[clamp(24px,5vw,80px)] lg:h-[88px]">
-            <a href="/" aria-label="blazemap home" onClick={handleCloseMenu} className="inline-flex min-h-11 shrink-0 items-center gap-2.5 text-[27px] font-bold tracking-[-0.04em]">
-              <Sprout aria-hidden="true" className="size-7" strokeWidth={1.8} />
-              blazemap
-            </a>
+          <div className="mx-auto flex h-20 max-w-[1440px] items-center justify-between gap-3 px-[clamp(24px,5vw,80px)] sm:gap-8 lg:h-[88px]">
+            <a href="/" aria-label="Blazemap home" onClick={handleCloseMenu} className="inline-flex shrink-0"><Brand compact /></a>
             <nav aria-label="Main navigation" className="hidden lg:block">
               <ul className="flex items-center gap-5 xl:gap-8">
                 {links.map(({ label, href }) => (
@@ -81,14 +91,15 @@ export default function MainLayout() {
                 ))}
               </ul>
             </nav>
-            <div className="hidden items-center gap-3 lg:flex">
+            <div className="ml-auto flex items-center gap-2 lg:ml-0">
+            {user ? <AccountMenu key={user.id} user={user} /> : isGuest ? <div className="hidden items-center gap-3 lg:flex">
               <Button asChild variant="ghost" className="min-h-11 px-3 font-bold">
                 <a href="/login?portal=government"><Building2 aria-hidden="true" className="size-4" />Government Login</a>
               </Button>
               <Button asChild className="min-h-11 rounded-full px-5 font-bold">
                 <a href="/login"><LogIn aria-hidden="true" className="size-4" />Login</a>
               </Button>
-            </div>
+            </div> : <span role="status" className="text-xs text-muted-foreground">{account.isError ? <button type="button" className="min-h-11 underline" onClick={() => void account.refetch()}>Retry account check</button> : "Checking account…"}</span>}
             <Button
               ref={menuButtonRef}
               type="button"
@@ -101,6 +112,7 @@ export default function MainLayout() {
               {isMenuOpen ? <X aria-hidden="true" className="size-5" /> : <Menu aria-hidden="true" className="size-5" />}
               <span className="sr-only">{isMenuOpen ? "Close menu" : "Open menu"}</span>
             </Button>
+            </div>
           </div>
           <nav id="mobile-navigation" aria-label="Mobile navigation" hidden={!isMenuOpen} data-lenis-prevent className="absolute inset-x-0 top-full z-50 max-h-[calc(100dvh-80px)] overflow-y-auto overscroll-contain border border-border bg-background px-[clamp(24px,5vw,80px)] py-4 shadow-lg lg:hidden">
             <ul className="flex flex-col gap-1">
@@ -112,27 +124,24 @@ export default function MainLayout() {
                 </li>
               ))}
             </ul>
-            <div className="mt-3 flex flex-row items-stretch gap-2">
+            {isGuest && <div className="mt-3 flex flex-row items-stretch gap-2">
               <Button asChild variant="outline" className="min-w-0 flex-[1.5] gap-1.5 px-2 text-xs font-bold">
                 <a href="/login?portal=government" onClick={handleCloseMenu}><Building2 aria-hidden="true" className="size-3.5" />Government Login</a>
               </Button>
               <Button asChild className="min-w-0 flex-1 gap-1.5 px-2 text-xs font-bold">
                 <a href="/login" onClick={handleCloseMenu}><LogIn aria-hidden="true" className="size-3.5" />Login</a>
               </Button>
-            </div>
+            </div>}
           </nav>
         </header>
         <main id="main-content" tabIndex={-1} className="min-w-0 flex-1">
-          <Outlet />
+          <Outlet context={accountUser} />
         </main>
-        {activePath !== "/contact" && <footer className="bg-forest text-background">
+        {!accountUser && activePath !== "/contact" && <footer className="bg-forest text-background">
           <div className="mx-auto max-w-[1440px] px-[clamp(24px,5vw,80px)] pb-12 pt-12 md:pt-16">
             <div className="flex flex-col justify-between gap-8 md:flex-row md:gap-16">
               <div className="max-w-sm">
-                <a href="/" aria-label="blazemap home" className="inline-flex min-h-11 items-center gap-2.5 text-[27px] font-bold tracking-[-0.04em]">
-                  <Sprout aria-hidden="true" className="size-7" strokeWidth={1.8} />
-                  blazemap
-                </a>
+                <a href="/" aria-label="Blazemap home" className="inline-flex"><Brand /></a>
                 <p className="mt-3 max-w-72 text-sm leading-7 text-sage">
                   Forest and land fire information for Kalimantan.
                 </p>

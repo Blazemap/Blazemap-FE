@@ -1,7 +1,7 @@
 import { AuthError } from "@/lib";
 import type { AuthMode, AuthPortal } from "@/lib";
 
-function authURL(): string {
+export function authURL(): string {
   const configured: unknown = import.meta.env?.VITE_AUTH_URL;
   if (configured === undefined || configured === "") return "/api/auth";
   try {
@@ -53,7 +53,8 @@ function requireAvailableUser(user: AuthUser): void {
 
 function errorCode(body: unknown, status: number): string {
   if (status === 429) return "TOO_MANY_REQUESTS";
-  if (status === 503) return "SERVICE_UNAVAILABLE";
+  if (status >= 500 && status <= 599) return "SERVICE_UNAVAILABLE";
+  if (status === 408) return "TIMEOUT";
   const code = isRecord(body) && typeof body.code === "string" ? body.code.toUpperCase() : "";
   if ((status === 401 || status === 403) && code === "EMAIL_NOT_VERIFIED") return code;
   if (status === 401 && code === "ACCOUNT_UNAVAILABLE") return code;
@@ -103,7 +104,10 @@ async function request(url: string, body: Record<string, string | boolean> | und
 }
 
 function loginURL(query: string, portal: AuthPortal): string {
-  return new URL(`/login?${query}${portal === "government" ? "&portal=government" : ""}`, window.location.origin).href;
+  const url = new URL(`/login?${query}${portal === "government" ? "&portal=government" : ""}`, window.location.origin);
+  const next = new URLSearchParams(window.location.search).get("next");
+  if (next && /^\/(?:dashboard|monitoring|feed|report|account|profile|my-reports(?:\/[a-zA-Z0-9_-]+)?)(?:\?[^#\\\s]*)?$/.test(next)) url.searchParams.set("next", next);
+  return url.href;
 }
 
 export async function signOut(signal?: AbortSignal): Promise<void> {
@@ -124,7 +128,7 @@ async function requirePortal(user: AuthUser, portal: AuthPortal, signal: AbortSi
   throw new AuthError(user.role === "ADMIN" ? "GOVERNMENT_PORTAL_REQUIRED" : "CITIZEN_PORTAL_REQUIRED", 403);
 }
 
-async function verifySession(portal: AuthPortal, signal: AbortSignal, expectedId?: string): Promise<void> {
+async function verifySession(portal: AuthPortal, signal: AbortSignal, expectedId?: string, previousSessionId?: string | null): Promise<AuthUser["role"]> {
   const current = await request(`${authURL()}/get-session`, undefined, signal);
   if (current === null) throw new AuthError("SESSION_REQUIRED", 401);
   if (
@@ -133,18 +137,37 @@ async function verifySession(portal: AuthPortal, signal: AbortSignal, expectedId
     (expectedId !== undefined && current.user.id !== expectedId)
   ) throw new AuthError("INVALID_RESPONSE", 502);
   requireAvailableUser(current.user);
-  await requirePortal(current.user, portal, signal);
+  await requirePortal(current.user, portal, signal, previousSessionId !== undefined && current.session.id !== previousSessionId);
+  return current.user.role;
 }
 
 export async function getSession(portal: AuthPortal, signal?: AbortSignal): Promise<void> {
   await verifySession(portal, requestSignal(signal));
 }
 
-export async function completeOAuth(portal: AuthPortal, signal?: AbortSignal): Promise<void> {
-  await getSession(portal, signal);
+export async function completeOAuth(portal: AuthPortal, signal?: AbortSignal): Promise<AuthUser["role"]> {
+  let previousSessionId: string | null | undefined;
+  try {
+    const stored: unknown = JSON.parse(sessionStorage.getItem("blazemap.oauth") ?? "null");
+    const attempt = new URLSearchParams(window.location.search).get("attempt");
+    if (isRecord(stored) && isId(attempt) && stored.attempt === attempt && stored.portal === portal &&
+      typeof stored.startedAt === "number" && Date.now() >= stored.startedAt && Date.now() - stored.startedAt < 600_000 &&
+      (stored.sessionId === null || isId(stored.sessionId))) {
+      previousSessionId = stored.sessionId;
+    }
+  } catch {
+    previousSessionId = undefined;
+  }
+  try {
+    return await verifySession(portal, requestSignal(signal), undefined, previousSessionId);
+  } finally {
+    if (previousSessionId !== undefined && !signal?.aborted) {
+      await Promise.resolve().then(() => sessionStorage.removeItem("blazemap.oauth")).catch(() => undefined);
+    }
+  }
 }
 
-export async function signIn(email: string, password: string, portal: AuthPortal, signal?: AbortSignal): Promise<void> {
+export async function signIn(email: string, password: string, portal: AuthPortal, signal?: AbortSignal): Promise<AuthUser["role"]> {
   const combined = requestSignal(signal);
   const callbackURL = loginURL("verified=1", portal);
   const result = await request(`${authURL()}/sign-in/email`, { email, password, callbackURL }, combined);
@@ -153,7 +176,7 @@ export async function signIn(email: string, password: string, portal: AuthPortal
   }
   requireAvailableUser(result.user);
   await requirePortal(result.user, portal, combined, true);
-  await verifySession(portal, combined, result.user.id);
+  return verifySession(portal, combined, result.user.id);
 }
 
 export async function signUp(name: string, email: string, password: string, signal?: AbortSignal): Promise<void> {
@@ -181,7 +204,13 @@ export async function getAuthCapabilities(signal?: AbortSignal): Promise<{ googl
 
 export async function startOAuth(mode: AuthMode, portal: AuthPortal, signal?: AbortSignal): Promise<string> {
   if (mode === "register" && portal === "government") throw new AuthError("GOVERNMENT_REGISTRATION_DISABLED", 403);
-  const callbackURL = loginURL("oauth=google&complete=1", portal);
+  const combined = requestSignal(signal);
+  const current = await request(`${authURL()}/get-session`, undefined, combined);
+  if (current !== null && (!isRecord(current) || !isRecord(current.session) || !isId(current.session.id))) {
+    throw new AuthError("INVALID_RESPONSE", 502);
+  }
+  const attempt = crypto.randomUUID();
+  const callbackURL = loginURL(`oauth=google&complete=1&attempt=${attempt}`, portal);
   const result = await request(`${authURL()}/sign-in/social`, {
     provider: "google",
     disableRedirect: true,
@@ -189,7 +218,7 @@ export async function startOAuth(mode: AuthMode, portal: AuthPortal, signal?: Ab
     callbackURL,
     newUserCallbackURL: callbackURL,
     errorCallbackURL: loginURL("oauth=google", portal),
-  }, requestSignal(signal));
+  }, combined);
   if (!isRecord(result) || result.redirect !== false || typeof result.url !== "string" || /[\s\\#]/.test(result.url)) {
     throw new AuthError("INVALID_RESPONSE", 502);
   }
@@ -201,6 +230,11 @@ export async function startOAuth(mode: AuthMode, portal: AuthPortal, signal?: Ab
       !isId(url.searchParams.get("client_id")) || !isId(url.searchParams.get("state")) ||
       url.searchParams.getAll("client_id").length !== 1 || url.searchParams.getAll("state").length !== 1
     ) throw new Error();
+    try {
+      sessionStorage.setItem("blazemap.oauth", JSON.stringify({ attempt, portal, startedAt: Date.now(), sessionId: current === null ? null : (current.session as Record<string, unknown>).id }));
+    } catch {
+      return url.href;
+    }
     return url.href;
   } catch {
     throw new AuthError("INVALID_RESPONSE", 502);

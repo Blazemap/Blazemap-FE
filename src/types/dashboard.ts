@@ -1,0 +1,45 @@
+export type DashboardUser = { id: string; name: string; email: string; image?: string; role: "USER" | "ADMIN"; canConfirmIncidents?: boolean };
+export type Verification = "UNVERIFIED" | "CONFIRMED_FIRE" | "NOT_FIRE";
+export type Handling = "OPEN" | "CHECK_SCHEDULED" | "ON_SCENE" | "RESPONDING" | "MONITORING" | "CLOSED";
+export type Priority = "HIGH" | "MEDIUM" | "LOW" | "UNASSESSED";
+export type MapItem = {
+  id: string;
+  kind: "publication" | "hotspot";
+  title: string;
+  latitude: number | null;
+  longitude: number | null;
+  time: string;
+  source: string;
+  location: string;
+  verification?: Verification;
+  handling?: Handling;
+  product?: string;
+  instrument?: string;
+  confidence?: string;
+  frp?: number | null;
+  fetchedAt?: string;
+  stale: boolean;
+};
+export type MapData = {
+  items: MapItem[];
+  updatedAt: string | null;
+  sourceStatus: "AVAILABLE" | "STALE" | "NOT_CONFIGURED" | "NOT_SYNCED" | "UNAVAILABLE";
+  lastSuccessAt: string | null;
+  limited: boolean;
+};
+export type CaseItem = {
+  id: string;
+  number: string;
+  title: string;
+  latitude: number | null;
+  longitude: number | null;
+  verification: Verification;
+  handling: Handling;
+  priority: Priority;
+  priorityReason: string | null;
+  updatedAt: string;
+  openedAt: string;
+};
+export type CaseEvidence = { id: string; version: number; fieldUpdates: { id: string; findings: string; observedAt: string; latitude: number | null; longitude: number | null }[] };
+export type CasesData = { items: CaseItem[]; total: number; page: number; pageSize: number };
+export type CaseFilters = { query: string; verification: string; priority: string; page: number };

@@ -1,3 +1,25 @@
+import type { PasswordValues } from "@/types";
+
+export function validatePasswordChange(values: PasswordValues): Partial<Record<"currentPassword" | "newPassword" | "confirmPassword", string>> {
+  const errors: Partial<Record<"currentPassword" | "newPassword" | "confirmPassword", string>> = {};
+  if (!values.currentPassword || values.currentPassword.length > 128) errors.currentPassword = "Enter your current password (up to 128 characters).";
+  if (values.newPassword.length < 12 || values.newPassword.length > 128) errors.newPassword = "Use a password between 12 and 128 characters.";
+  else if (values.newPassword === values.currentPassword) errors.newPassword = "Choose a different password.";
+  if (!values.confirmPassword || values.newPassword !== values.confirmPassword) errors.confirmPassword = "Passwords do not match.";
+  return errors;
+}
+
+export function passwordError(error: unknown): string {
+  if (error instanceof AuthError) {
+    if (error.code === "INVALID_PASSWORD") return "Your current password is incorrect.";
+    if (error.code === "CREDENTIAL_ACCOUNT_NOT_FOUND") return "This account has no password. Manage your password with your sign-in provider.";
+    if (error.code === "ACCOUNT_CHANGED" || error.status === 401 || error.code === "SESSION_NOT_FRESH") return "Sign in again with the same account before changing your password.";
+    if (error.status === 429) return "Too many requests. Wait before trying again.";
+    if (["PASSWORD_TOO_SHORT", "PASSWORD_TOO_LONG"].includes(error.code)) return "Use a password between 12 and 128 characters.";
+  }
+  return "The password change could not be confirmed. Try signing in with the new password before retrying.";
+}
+
 export type AuthMode = "login" | "register";
 export type AuthPortal = "citizen" | "government";
 
@@ -10,6 +32,12 @@ export type AuthValues = {
 
 export type AuthField = keyof AuthValues;
 export type AuthFieldErrors = Partial<Record<AuthField, string>>;
+
+export function sessionRetryDelay(value: string | null, now = Date.now()): number {
+  const seconds = value && /^\d+(?:\.\d+)?$/.test(value) ? Number(value) * 1000 : NaN;
+  const delay = Number.isFinite(seconds) ? seconds : value ? Date.parse(value) - now : NaN;
+  return Number.isFinite(delay) ? Math.max(1000, Math.min(300000, delay)) : 60000;
+}
 
 export class AuthError extends Error {
   readonly code: string;
@@ -47,7 +75,8 @@ export function getAuthErrorMessage(error: unknown): string {
       return "Unable to clear the current session. You may still be signed in. Use another account and try logging in again.";
     }
     if (error.status === 429) return "Too many requests. Please wait before trying again.";
-    if (error.status === 503) return "Authentication is temporarily unavailable. Please try again later.";
+    if (error.status >= 500 && error.status <= 599) return "Authentication is temporarily unavailable. Please try again later.";
+    if (error.status === 408) return "The request timed out. Please try again.";
     switch (error.code) {
       case "INVALID_EMAIL":
         return "Enter a valid email address.";
@@ -90,8 +119,8 @@ export function getAuthErrorMessage(error: unknown): string {
   return "Unable to complete the request. Please try again.";
 }
 
-export function getOAuthErrorMessage(code: string | null): string {
-  switch (code?.toLowerCase()) {
+export function getOAuthErrorMessage(code: unknown): string {
+  switch (typeof code === "string" ? code.toLowerCase() : "") {
     case "access_denied":
       return "Google login was cancelled. Try again or use email and password.";
     case "account_not_linked":

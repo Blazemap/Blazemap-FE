@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { queryClient } from "@/config/react-query";
+import { queryKeys } from "@/api/queryKeys";
 import { completeOAuth, getAuthCapabilities, resendVerification, signIn, signUp, startOAuth } from "@/api";
 import { AuthError, getAuthErrorMessage, getOAuthErrorMessage, validateAuth } from "@/lib";
 import type { AuthField, AuthFieldErrors, AuthMode, AuthPortal, AuthValues } from "@/lib";
@@ -10,6 +12,7 @@ export function useAuth(mode: AuthMode, portal: AuthPortal = "citizen") {
     complete: mode === "login" && params.get("oauth") === "google" && params.get("complete") === "1" && !params.has("error"),
     error: mode === "login" && params.get("oauth") === "google" && params.has("error") ? getOAuthErrorMessage(params.get("error")) : "",
   }));
+  const [role, setRole] = useState<"USER" | "ADMIN" | null>(null);
   const [phase, setPhase] = useState<"form" | "checking" | "verification" | "success">(oauth.complete ? "checking" : "form");
   const [isPending, setIsPending] = useState(oauth.complete);
   const [error, setError] = useState(oauth.error);
@@ -32,8 +35,8 @@ export function useAuth(mode: AuthMode, portal: AuthPortal = "citizen") {
     if (oauth.complete) {
       const controller = new AbortController();
       request.current = controller;
-      void completeOAuth(portal, controller.signal).then(() => {
-        if (request.current === controller) setPhase("success");
+      void completeOAuth(portal, controller.signal).then(verifiedRole => {
+        if (request.current === controller) { queryClient.removeQueries({ queryKey: queryKeys.account }); setRole(verifiedRole); setPhase("success"); }
       }).catch((cause: unknown) => {
         if (request.current !== controller) return;
         setPhase("form");
@@ -107,16 +110,19 @@ export function useAuth(mode: AuthMode, portal: AuthPortal = "citizen") {
       if (mode === "register") {
         await signUp(values.name.trim(), email, values.password, controller.signal);
       } else {
-        await signIn(email, values.password, portal, controller.signal);
+        const verifiedRole = await signIn(email, values.password, portal, controller.signal);
+        if (request.current !== controller) return;
+        queryClient.removeQueries({ queryKey: queryKeys.account });
+        setRole(verifiedRole);
       }
       if (request.current !== controller) return;
       setPhase(mode === "register" ? "verification" : "success");
     } catch (cause) {
       if (request.current !== controller) return;
       const message = getAuthErrorMessage(cause);
-      if (cause instanceof AuthError && cause.code === "EMAIL_NOT_VERIFIED") {
+      if (cause instanceof AuthError && cause.code === "EMAIL_NOT_VERIFIED" && (cause.status === 401 || cause.status === 403)) {
         setPhase("verification");
-      } else if (cause instanceof AuthError && cause.status !== 429 && cause.status !== 503) {
+      } else if (cause instanceof AuthError && cause.status !== 408 && cause.status !== 429 && cause.status < 500) {
         if (cause.code === "INVALID_EMAIL") setFieldErrors({ email: message });
         else if (["INVALID_EMAIL_OR_PASSWORD", "INVALID_PASSWORD", "PASSWORD_TOO_SHORT", "PASSWORD_TOO_LONG"].includes(cause.code)) {
           setFieldErrors({ password: message });
@@ -185,5 +191,5 @@ export function useAuth(mode: AuthMode, portal: AuthPortal = "citizen") {
     }
   }
 
-  return { phase, isPending, error, notice, fieldErrors, attempt, googleState, submit, startGoogle, resend, reset, clearFieldError, verificationEmail };
+  return { role, phase, isPending, error, notice, fieldErrors, attempt, googleState, submit, startGoogle, resend, reset, clearFieldError, verificationEmail };
 }

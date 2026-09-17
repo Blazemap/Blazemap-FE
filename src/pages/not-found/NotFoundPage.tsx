@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Sprout } from "lucide-react";
+import { Brand } from "@/components/common";
 import { isRouteErrorResponse, useRouteError } from "react-router-dom";
 import { Button } from "@/components/ui";
 
@@ -18,10 +18,7 @@ export default function NotFoundPage() {
 
   return (
     <main id="main-content" aria-labelledby="error-title" className="grid min-h-dvh grid-rows-[auto_1fr] bg-background px-6 py-6 text-forest sm:px-10 sm:py-8">
-      <a href="/" aria-label="Blazemap home" className="inline-flex min-h-11 w-fit items-center gap-2 text-lg font-extrabold tracking-tight">
-        <Sprout size={23} strokeWidth={1.8} aria-hidden="true" />
-        Blazemap
-      </a>
+      <a href="/" aria-label="Blazemap home" className="inline-flex w-fit"><Brand /></a>
 
       <div className="flex items-center justify-center py-10 sm:py-12">
         <div className="flex w-full max-w-xl flex-col items-center text-center">
