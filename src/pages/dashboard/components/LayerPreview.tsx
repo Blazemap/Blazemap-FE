@@ -1,5 +1,5 @@
 export function LayerPreview({ hotspot }: { hotspot: boolean }) {
-  return <svg aria-hidden="true" focusable="false" viewBox="0 0 160 100" className={`block h-24 w-full rounded-sm border ${hotspot ? "border-amber-900/20 bg-[#263c35]" : "border-emerald-900/15 bg-[#edf1e5]"}`}>
+  return <svg aria-hidden="true" focusable="false" viewBox="0 0 160 100" className={`block h-24 w-full rounded-sm border ${hotspot ? "border-amber-900/20 bg-[#263c35]" : "border-primary/15 bg-[#edf1e5]"}`}>
     <path d="M0 0H160V100H0Z" fill={hotspot ? "#263c35" : "#edf1e5"} />
     <g fill={hotspot ? "#395348" : "#c6d8b5"}>
       <path d="M0 0H74L65 17 42 24 33 43 0 37Z" />
@@ -27,11 +27,11 @@ export function LayerPreview({ hotspot }: { hotspot: boolean }) {
         <rect x="101" y="61" width="18" height="18" fill="#ffd078" />
         <rect x="121" y="61" width="18" height="18" />
       </g>
-    </> : <g fill="#214e3c" stroke="#ffffff" strokeWidth="1.8" strokeLinejoin="round">
+    </> : <g fill="var(--color-primary)" stroke="#ffffff" strokeWidth="1.8" strokeLinejoin="round">
       {[[42, 34], [111, 25], [122, 76]].map(([x, y]) => <g key={`${x}-${y}`} transform={`translate(${x} ${y})`}>
         <path d="M0 10C-3 6-10 0-10-6a10 10 0 0 1 20 0C10 0 3 6 0 10Z" />
         <rect x="-3.5" y="-11" width="7" height="9" rx="1" fill="#ffffff" stroke="none" />
-        <path d="M-2-8H2M-2-5H1" fill="none" stroke="#214e3c" strokeWidth="1" />
+        <path d="M-2-8H2M-2-5H1" fill="none" stroke="var(--color-primary)" strokeWidth="1" />
       </g>)}
     </g>}
   </svg>;

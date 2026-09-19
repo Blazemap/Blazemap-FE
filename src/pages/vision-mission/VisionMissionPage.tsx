@@ -30,7 +30,7 @@ export default function VisionMissionPage() {
 
   return (
     <div className="overflow-clip bg-background">
-      <section aria-labelledby="vision-title" className="relative isolate flex min-h-[calc(100svh-80px)] items-end overflow-hidden bg-forest text-white lg:min-h-[calc(100svh-88px)]">
+      <section aria-labelledby="vision-title" className="relative isolate flex min-h-[calc(100svh-80px)] items-end overflow-hidden bg-[#173b2b] text-white lg:min-h-[calc(100svh-88px)]">
         <motion.img
           src={rainforest}
           srcSet={`${rainforestSmall} 768w, ${rainforest} 1536w`}
@@ -48,7 +48,7 @@ export default function VisionMissionPage() {
         <div aria-hidden="true" className="absolute inset-0 -z-20 bg-[linear-gradient(115deg,rgba(15,45,32,0.97)_5%,rgba(23,59,43,0.84)_48%,rgba(23,59,43,0.25)_100%)]" />
         <div aria-hidden="true" className="absolute inset-0 -z-20 bg-[radial-gradient(circle_at_72%_22%,rgba(196,208,181,0.22),transparent_32%)]" />
         <div aria-hidden="true" className="absolute inset-x-0 top-0 -z-10 h-40 bg-linear-to-b from-background via-background/75 to-transparent sm:h-52" />
-        <div aria-hidden="true" className="absolute inset-x-0 bottom-0 -z-10 h-52 bg-linear-to-t from-forest to-transparent" />
+        <div aria-hidden="true" className="absolute inset-x-0 bottom-0 -z-10 h-52 bg-linear-to-t from-[#173b2b] to-transparent" />
 
         <motion.div
           initial={isReducedMotion ? false : { opacity: 0, y: 28 }}
@@ -98,7 +98,7 @@ export default function VisionMissionPage() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, amount: 0.2 }}
                 transition={{ duration: isReducedMotion ? 0 : 0.65, delay: isReducedMotion ? 0 : index * 0.08, ease: [0.16, 1, 0.3, 1] }}
-                className="group flex min-h-[340px] flex-col rounded-2xl border border-primary/10 bg-white/80 p-7 shadow-[0_24px_70px_-48px_rgba(23,59,43,0.75)] backdrop-blur-sm sm:p-8"
+                className="group flex min-h-[340px] flex-col rounded-2xl border border-primary/10 bg-white/80 p-7 shadow-[0_24px_70px_-48px_rgba(67,25,31,0.75)] backdrop-blur-sm sm:p-8"
               >
                 <div className="flex items-center justify-between">
                   <span className="inline-flex size-12 items-center justify-center rounded-full bg-secondary text-primary"><Icon size={22} strokeWidth={1.7} aria-hidden="true" /></span>
@@ -112,7 +112,7 @@ export default function VisionMissionPage() {
         </div>
       </section>
 
-      <section aria-labelledby="commitment-title" className="relative isolate overflow-hidden bg-forest text-white">
+      <section aria-labelledby="commitment-title" className="relative isolate overflow-hidden bg-[#173b2b] text-white">
         <img src={rainforestSmall} width={768} height={512} alt="" aria-hidden="true" loading="lazy" className="absolute inset-0 -z-20 h-full w-full object-cover opacity-25" />
         <div aria-hidden="true" className="absolute inset-0 -z-10 bg-[linear-gradient(105deg,rgba(23,59,43,1)_15%,rgba(23,59,43,0.9)_58%,rgba(41,77,54,0.6)_100%)]" />
         <motion.div

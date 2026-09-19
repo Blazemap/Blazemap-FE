@@ -1,5 +1,5 @@
 export function MapSkeleton() {
-  return <div role="status" aria-label="Loading situation map" className="relative h-full min-h-0 overflow-hidden bg-secondary motion-safe:animate-pulse"><span className="sr-only">Loading situation map</span><span className="absolute inset-0 bg-[linear-gradient(135deg,#e6eddf_0%,#f7f7ef_48%,#dce2d3_100%)]" /><span className="absolute bottom-28 right-3 flex flex-col gap-2"><span className="size-11 rounded bg-white shadow-sm" /><span className="size-11 rounded bg-white shadow-sm" /><span className="size-11 rounded bg-white shadow-sm" /></span><span className="absolute bottom-3 right-3 h-6 w-28 rounded bg-white shadow-sm" /></div>;
+  return <div role="status" aria-label="Loading situation map" className="relative h-full min-h-0 overflow-hidden bg-secondary motion-safe:animate-pulse"><span className="sr-only">Loading situation map</span><span className="absolute inset-0 bg-linear-to-br from-secondary via-background via-48% to-border" /><span className="absolute bottom-28 right-3 flex flex-col gap-2"><span className="size-11 rounded bg-white shadow-sm" /><span className="size-11 rounded bg-white shadow-sm" /><span className="size-11 rounded bg-white shadow-sm" /></span><span className="absolute bottom-3 right-3 h-6 w-28 rounded bg-white shadow-sm" /></div>;
 }
 
 export function ObservationListSkeleton() {

@@ -44,7 +44,7 @@ export default function FaqPage() {
 
   return (
     <div className="bg-white">
-      <section aria-labelledby="faq-title" className="relative isolate flex min-h-[calc(100svh-80px)] items-end overflow-hidden bg-forest text-white lg:min-h-[calc(100svh-88px)]">
+      <section aria-labelledby="faq-title" className="relative isolate flex min-h-[calc(100svh-80px)] items-end overflow-hidden bg-[#173b2b] text-white lg:min-h-[calc(100svh-88px)]">
         <motion.img
           src={faqForest}
           width={1536}
@@ -59,7 +59,7 @@ export default function FaqPage() {
         />
         <div aria-hidden="true" className="absolute inset-0 -z-20 bg-[linear-gradient(90deg,rgba(10,43,30,0.94)_0%,rgba(15,54,37,0.68)_44%,rgba(15,54,37,0.08)_78%)]" />
         <div aria-hidden="true" className="absolute inset-0 -z-20 bg-[linear-gradient(to_bottom,rgba(23,59,43,0.06)_0%,rgba(23,59,43,0.14)_52%,rgba(23,59,43,0.78)_100%)]" />
-        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-36 bg-linear-to-b from-background via-sage/30 to-transparent sm:h-48" />
+        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-36 bg-linear-to-b from-background via-[#c4d0b5]/30 to-transparent sm:h-48" />
         <motion.div
           initial={isReducedMotion ? false : { opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}

@@ -1,21 +1,21 @@
 import type { ReactNode } from "react";
 
-type Column = { label: string; width: number; shape?: "identity" | "record" | "condition" | "freshness" | "pill" | "icons" | "action" | "assignment" | "link"; padding?: string };
+type Column = { label: string; width: number; shape?: "identity" | "record" | "condition" | "freshness" | "pill" | "icons" | "edit" | "case" | "link"; padding?: string };
 const edge = "px-5 sm:px-6";
 const action: Column = { label: "Action", width: 104, shape: "link", padding: `${edge} text-right` };
 const condition: Column = { label: "Condition", width: 210, shape: "condition" };
 const freshness: Column = { label: "Freshness", width: 190, shape: "freshness" };
 const state: Column = { label: "State", width: 80, shape: "pill" };
-const activeAction: Column = { label: "Action", width: 224, shape: "action", padding: "px-5" };
+const editAction: Column = { label: "Action", width: 68, shape: "edit", padding: "px-5" };
 export const monitoringTableShapes: Record<string, { minWidth: string; columns: Column[] }> = {
-  teams: { minWidth: "min-w-[820px]", columns: [{ label: "Team", width: 160, shape: "record", padding: "px-5" }, condition, freshness, state, activeAction] },
-  equipment: { minWidth: "min-w-[860px]", columns: [{ label: "Equipment", width: 180, shape: "record", padding: "px-5" }, condition, freshness, state, activeAction] },
-  assignments: { minWidth: "min-w-[820px]", columns: [{ label: "Case", width: 160, shape: "record", padding: "px-5" }, { label: "Team", width: 140 }, { label: "Status", width: 100, shape: "pill" }, freshness, { label: "Action", width: 256, shape: "assignment", padding: "px-5" }] },
+  teams: { minWidth: "min-w-[820px]", columns: [{ label: "Team", width: 160, shape: "record", padding: "px-5" }, condition, freshness, state, editAction] },
+  equipment: { minWidth: "min-w-[860px]", columns: [{ label: "Equipment", width: 180, shape: "record", padding: "px-5" }, condition, freshness, state, editAction] },
+  assignments: { minWidth: "min-w-[820px]", columns: [{ label: "Case", width: 240, shape: "case", padding: "px-5" }, { label: "Team", width: 140 }, { label: "Status", width: 100, shape: "pill" }, freshness, editAction] },
   reports: { minWidth: "min-w-[980px]", columns: [{ label: "Report", width: 220, shape: "identity", padding: edge }, { label: "Observations", width: 88, shape: "icons" }, { label: "Priority", width: 80 }, { label: "Workflow", width: 110 }, { label: "Location", width: 160 }, { label: "Observed", width: 130, padding: edge }, action] },
   cases: { minWidth: "min-w-[900px]", columns: [{ label: "Case", width: 220, shape: "identity", padding: edge }, { label: "Verification", width: 135 }, { label: "Handling", width: 130 }, { label: "Priority", width: 90 }, { label: "Context updated", width: 140, padding: edge }, action] },
   users: { minWidth: "min-w-[900px]", columns: [{ label: "User", width: 220, shape: "identity", padding: edge }, { label: "Role", width: 80, shape: "pill" }, { label: "Account", width: 80, shape: "pill" }, { label: "Email", width: 90, shape: "pill" }, { label: "Created", width: 140, padding: edge }, action] },
 };
-const panel = "rounded-xl border border-primary/10 bg-white shadow-[0_18px_50px_-42px_rgba(23,59,43,0.9)]";
+const panel = "rounded-xl border border-primary/10 bg-white shadow-[0_18px_50px_-42px_rgba(67,25,31,0.9)]";
 function Mark({ className = "h-4 w-3/4" }: { className?: string }) {
   return <span className={`block max-w-full rounded bg-secondary ${className}`} />;
 }
@@ -23,7 +23,8 @@ function Loading({ label, children, className = "" }: { label: string; children:
   return <div role="status" aria-label={label} className={className}><span className="sr-only">{label}</span><div aria-hidden="true" className="motion-safe:animate-pulse">{children}</div></div>;
 }
 function Cell({ shape }: { shape?: Column["shape"] }) {
-  if (shape === "action" || shape === "assignment") return <div className={shape === "assignment" ? "min-w-64" : "min-w-56"}>{shape === "assignment" && <Mark className="mt-2 h-11 w-full rounded-lg" />}<Mark className={`${shape === "assignment" ? "mt-2 " : ""}h-10 w-full rounded-lg`} /><Mark className="mt-2 h-11 w-full rounded-full" /></div>;
+  if (shape === "edit") return <Mark className="h-11 w-[68px] rounded-full" />;
+  if (shape === "case") return <><Mark className="h-5 w-full" /><Mark className="mt-1 h-4 w-4/5" /><Mark className="mt-1 h-4 w-3/4" /></>;
   if (shape === "icons") return <div className="flex gap-1"><Mark className="size-6" /><Mark className="size-6" /></div>;
   if (shape === "pill") return <Mark className="h-6 w-20 rounded-full" />;
   if (shape === "link") return <div className="flex min-h-11 items-center justify-end"><Mark className="h-3 w-20" /></div>;
@@ -39,11 +40,18 @@ export function InventorySkeleton({ section }: { section: "reports" | "cases" | 
   return <Loading label={`Loading ${section}`}><TableSkeleton {...monitoringTableShapes[section]} count={8} /></Loading>;
 }
 export function OperationsSkeleton({ section }: { section: "teams" | "equipment" | "assignments" | "access-water" }) {
-  if (section === "assignments") return <Loading label="Loading assignments inventory"><section className={`overflow-hidden ${panel}`}><header className="flex justify-between gap-4 border-b px-5 py-4"><div><Mark className="h-6 w-48" /><Mark className="mt-1 h-4 w-64" /></div><Mark className="h-11 w-24 rounded-full" /></header><div className="grid gap-4 border-b p-5 sm:grid-cols-2"><FormField /><FormField /><Mark className="h-5 w-40" /></div><TableSkeleton minWidth="min-w-[820px]" columns={monitoringTableShapes.assignments.columns.map(column => column.shape === "assignment" ? { ...column, width: 100, shape: "link" } : column)} /></section><Mark className="mt-5 h-4 w-full" /></Loading>;
-  const summaries = section === "teams" || section === "equipment" ? 2 : 1;
-  return <Loading label={`Loading ${section} inventory`}><section className={`overflow-hidden ${panel}`}><header className="flex items-start justify-between gap-4 border-b border-primary/10 px-5 py-4 sm:px-6"><div className="flex-1"><Mark className="h-6 w-48" /><Mark className="mt-1 h-4 w-96" /></div><Mark className="size-[19px]" /></header>{Array.from({ length: summaries }, (_, index) => <div key={index} data-skeleton="collapsed-form" className="border-b border-primary/10 bg-secondary/20 p-5"><div className="flex min-h-11 items-start gap-2"><Mark className="mt-1 size-3" /><Mark className="h-5 w-44" /></div></div>)}{section === "access-water" ? <div className="grid gap-0 xl:grid-cols-2">{["Access", "Water"].map((title, index) => <section key={title} className={index === 0 ? "border-b border-primary/10 xl:border-b-0 xl:border-r" : ""}><h3 className="px-5 py-4 text-sm font-extrabold">{title}</h3><ul className="divide-y divide-primary/10">{Array.from({ length: 3 }, (_, row) => <li key={row} className="grid gap-3 px-5 py-4 sm:grid-cols-[1fr_auto]"><div><Mark className="h-6 w-40" /><Mark className="mt-1 h-4 w-64" /><div className="mt-2"><Cell shape="condition" /></div></div><Mark className="h-4 w-32" /></li>)}</ul></section>)}</div> : <TableSkeleton {...monitoringTableShapes[section]} />}</section><Mark className="mt-5 h-4 w-full" /></Loading>;
+  return <Loading label={`Loading ${section === "access-water" ? "access and water" : section} inventory`}>
+    <section className={`overflow-hidden ${panel}`}>
+      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-primary/10 px-5 py-4 sm:px-6"><div className="min-w-0 flex-1"><Mark className="h-6 w-48" /><Mark className="mt-1 h-4 w-96" /></div><Mark className="h-11 w-[86px] shrink-0 rounded-full" /></header>
+      {section === "assignments" && <div className="grid gap-4 border-b p-5 sm:grid-cols-2"><FormField /><FormField /><Mark className="h-5 w-40" /></div>}
+      {section === "access-water" ? <div className="grid gap-0 xl:grid-cols-2">{["Access", "Water"].map((title, index) => <section key={title} className={index === 0 ? "border-b border-primary/10 xl:border-b-0 xl:border-r" : ""}><h3 className="px-5 py-4 text-sm font-extrabold">{title}</h3><ul className="divide-y divide-primary/10">{Array.from({ length: 3 }, (_, row) => <li key={row} className="grid gap-3 px-5 py-4 sm:grid-cols-[1fr_auto]"><div className="min-w-0"><Mark className="h-6 w-40" /><Mark className="mt-1 h-4 w-64" /><div className="mt-2 max-w-[32ch]"><Cell shape="condition" /></div></div><div className="space-y-3"><Mark className="h-4 w-32" /><Cell shape="edit" /></div></li>)}</ul></section>)}</div> : <TableSkeleton {...monitoringTableShapes[section]} />}
+    </section>
+    <Mark className="mt-5 h-4 w-full" />
+  </Loading>;
 }
-export function AssignmentFormSkeleton() {
+export function AssignmentFormSkeleton({ stage }: { stage?: "cases" | "details" }) {
+  if (stage === "cases") return <Loading label="Loading open cases"><FormField /></Loading>;
+  if (stage === "details") return <Loading label="Loading assignment form"><div className="space-y-4"><div className="space-y-1"><Mark className="h-4 w-full" /><Mark className="h-4 w-3/4" /></div><div className="flex min-h-11 items-center"><Mark className="h-5 w-60" /></div><div className="grid gap-4"><FormField /><FormField height="h-24" /><FormField /><Mark className="h-11 w-full rounded-full" /></div></div></Loading>;
   return <Loading label="Loading assignment form"><div className="grid gap-4">{[0, 1, 2, 3].map(index => <FormField key={index} height={index === 2 ? "h-24" : "h-11"} />)}<Mark className="h-11 w-full rounded-full" /></div></Loading>;
 }
 export function StatSkeletons() {

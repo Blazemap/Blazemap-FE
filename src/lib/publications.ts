@@ -2,6 +2,8 @@ import type { PublicPerimeter } from "./perimeter";
 
 export type Publication = {
   id: string; slug: string; title: string; summary: string; body: string;
+  type?: "UPDATE" | "ANNOUNCEMENT" | "WARNING" | "EDUCATION";
+  advisory?: { kind: "INFORMATIONAL_ADVISORY"; operationalReferences: WarningReference[] };
   outcome: "CONFIRMED" | "DECLINED" | null; status: "PUBLISHED" | "SUPERSEDED" | "WITHDRAWN";
   publishedAt: string; updatedAt: string; validUntil: string | null; expired: boolean;
   regions: { name: string }[]; sources: { title: string; url: string }[];
@@ -11,6 +13,7 @@ export type Publication = {
   latitude: number | null; longitude: number | null; publicPerimeter?: PublicPerimeter;
   caseNumber?: string; handlingStatus?: import("../types/dashboard").Handling; windContext?: import("./wind").WindContext | null;
 };
+export type WarningReference = { featureId: string; updateId: string; name: string; kind: "ROAD" | "DESIGNATED_LOCATION"; condition: string; source: string; observedAt: string; provider: string };
 export type CitizenFeedItem = ({ kind: "OWN_REPORT"; occurredAt: string } & import("../types/reports").OwnReport) | ({ kind: "PUBLICATION"; occurredAt: string } & Publication);
 export type FeedPage<T> = { data: T[]; meta: { total: number; page: number; pageSize: number } };
 export const feedPageSize = 10;

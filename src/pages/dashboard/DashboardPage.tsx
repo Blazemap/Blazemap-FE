@@ -3,6 +3,8 @@ import { Link, useLoaderData, useLocation, useNavigate, useSearchParams } from "
 import { Activity, FileText, List, RefreshCw, ShieldCheck } from "lucide-react";
 import { usePublicationMap } from "@/hooks/dashboard/usePublicationMap";
 import MapLayers from "./components/MapLayers";
+import CaseQueue from "./components/CaseQueue";
+import ReportCandidates from "./components/ReportCandidates";
 import { foreground } from "@/assets";
 import { FeedEmpty, FeedRow, FeedRowsSkeleton, FeedSentinel } from "./components/FeedRow";
 import { useGovernmentCase, useGovernmentReport, useGovernmentReports } from "@/hooks/dashboard/useGovernment";
@@ -138,7 +140,7 @@ function Workspace({ user }: { user: DashboardUser }) {
   </div>;
   const detailOpen = !!selected || !!report || !!caseId;
   const reportDrawing = perimeterDraft?.caseId === `report:${report?.id}`;
-  const detail = caseId ? <CasePanel key={caseId} user={user} id={caseId} draft={perimeterDraft} setDraft={setPerimeterDraft} canDraw={!feed} onWind={setWind} onDraft={onCaseDraft} /> : report ? (reportDetail.initialLoading ? <GovernmentReportDetailSkeleton /> : <>{reportDetail.failed && <div role="alert" className="space-y-3 p-4 text-sm"><p>Report details could not refresh.</p><Button variant="outline" onClick={reportDetail.retry}>Retry</Button></div>}<fieldset disabled={reportsUnavailable} aria-busy={reportDetail.refreshing}><ReportReview key={report.id} user={user} report={report} onDraft={onDraft} perimeterDraft={reportDrawing ? perimeterDraft : null} setPerimeterDraft={setPerimeterDraft} canDraw={!feed && (!perimeterDraft || !!reportDrawing)} /></fieldset></>) : selected ? <ItemDetail item={selected} /> : null;
+  const detail = caseId ? <CasePanel key={caseId} user={user} id={caseId} draft={perimeterDraft} setDraft={setPerimeterDraft} canDraw={!feed} onWind={setWind} onDraft={onCaseDraft} /> : report ? (reportDetail.initialLoading ? <GovernmentReportDetailSkeleton /> : <>{reportDetail.failed && <div role="alert" className="space-y-3 p-4 text-sm"><p>Report details could not refresh.</p><Button variant="outline" onClick={reportDetail.retry}>Retry</Button></div>}<fieldset disabled={reportsUnavailable} aria-busy={reportDetail.refreshing}><ReportReview key={report.id} user={user} report={report} onDraft={onDraft} perimeterDraft={reportDrawing ? perimeterDraft : null} setPerimeterDraft={setPerimeterDraft} canDraw={!feed && (!perimeterDraft || !!reportDrawing)} /></fieldset></>) : selected ? <><ItemDetail item={selected} />{selected.kind === "hotspot" && <ReportCandidates key={selected.id} user={user} report={{ id: selected.id.replace(/^hotspot:/, ""), case: null }} kind="hotspots" disabled={loaded.failed} onDraft={setCaseDraft} />}</> : null;
   return <main className="relative isolate h-dvh overflow-hidden bg-secondary/40 text-forest">
     <DraftGuard dashboard dirty={!!perimeterDraft || caseDraft.dirty} pending={!!perimeterDraft?.pending || caseDraft.pending} />
     <h1 className="sr-only">Coordination map</h1>
@@ -157,6 +159,7 @@ function Workspace({ user }: { user: DashboardUser }) {
     <MapPanel title="List" count={`${items.length} observations`} side="left" desktop={desktop} open={!feed && !perimeterDraft && listOpen && (desktop || !detailOpen)} keepMounted disabled={!!perimeterDraft} onClose={() => setListOpen(false)}>{observations}</MapPanel>
     <MapPanel title="Worklist" count={internalFeed.data ? `${reportTotal} reports` : undefined} side="center" desktop={desktop} open={!feed && !perimeterDraft && worklistOpen && (desktop || !detailOpen)} keepMounted disabled={!!perimeterDraft} onClose={() => setWorklistOpen(false)}>
       <GovernmentWorklist reports={internalFeed} status={reportStatus} setStatus={setReportStatus} onSelectReport={selectReport} onViewReport={viewReport} />
+      <CaseQueue user={user} onSelect={selectCase} />
     </MapPanel>
     <MapPanel title={caseId ? "Internal case details" : report ? `Review ${report.number}` : selected?.title ?? "Observation details"} count={!report && detailOpen ? "1 selected" : undefined} desktop={desktop} open={!feed && detailOpen} drawing={!!perimeterDraft} disabled={reviewDraft.pending || caseDraft.pending || !!perimeterDraft} onClose={closeDetail}>{detail}</MapPanel>
     <div inert={!!perimeterDraft || (!desktop && detailOpen)} className="absolute bottom-6 left-1/2 z-30 hidden w-[calc(100%-160px)] max-w-3xl -translate-x-1/2 items-center gap-1 rounded-full border bg-white p-2 shadow-xl sm:flex">{searchControl("observation-search", "top")}{actions}</div>

@@ -4,7 +4,8 @@ import type { DashboardUser } from "@/types";
 import { handlingLabels, priorityLabels, verificationLabels } from "@/constants";
 import { Button } from "@/components/ui";
 import { useGovernmentCase } from "@/hooks/dashboard/useGovernment";
-import { formatTime } from "@/pages/dashboard/utils";
+import CaseAnalysis from "./CaseAnalysis";
+import CaseExposure from "./CaseExposure";
 import GovernmentReports, { type ReportSelectionProps } from "./GovernmentReports";
 import CaseEvidence from "./CaseEvidence";
 import CasePerimeter, { type PerimeterEditorProps } from "./CasePerimeter";
@@ -24,7 +25,8 @@ export function CasePanel({ user, id, draft, setDraft, canDraw, onWind, onDraft,
   const [evidenceDraft, setEvidenceDraft] = useState({ dirty: false, pending: false });
   const [publicationDraft, setPublicationDraft] = useState({ dirty: false, pending: false });
   const [assignmentDraft, setAssignmentDraft] = useState({ dirty: false, pending: false });
-  useEffect(() => { onDraft(evidenceDraft.dirty || publicationDraft.dirty || assignmentDraft.dirty, evidenceDraft.pending || publicationDraft.pending || assignmentDraft.pending); }, [evidenceDraft, publicationDraft, assignmentDraft, onDraft]);
+  const [analysisDraft, setAnalysisDraft] = useState({ dirty: false, pending: false });
+  useEffect(() => { onDraft(evidenceDraft.dirty || publicationDraft.dirty || assignmentDraft.dirty, evidenceDraft.pending || publicationDraft.pending || assignmentDraft.pending || analysisDraft.pending); }, [evidenceDraft, publicationDraft, assignmentDraft, analysisDraft, onDraft]);
   useEffect(() => () => onDraft(false, false), [onDraft]);
   useEffect(() => { if (resource.forbidden) setDraft(null); }, [resource.forbidden, setDraft]);
   return <section aria-label="Selected internal case" className="bg-white p-4"><h3 className="font-extrabold">{detail?.title || "Case detail"}</h3>
@@ -36,7 +38,8 @@ export function CasePanel({ user, id, draft, setDraft, canDraw, onWind, onDraft,
       <CaseForecastRegion user={user} detail={detail} refresh={resource.retry} />
       <CaseWind detail={detail} failed={resource.failed} onWind={onWind} />
       <fieldset disabled={resource.failed || resource.loading}><CaseEvidence key={`${detail.id}:${reportReviewStatus ?? ""}`} reportId={reportId} reportReviewStatus={reportReviewStatus} user={user} detail={detail} refresh={resource.retry} onDraft={setEvidenceDraft} draft={draft} setDraft={setDraft} canDraw={canDraw} /><fieldset disabled={evidenceDraft.pending}><CasePerimeter user={user} detail={detail} canDraw={canDraw} draft={draft} setDraft={setDraft} refresh={resource.retry} /></fieldset>{reportReviewStatus !== "DECLINED" && <CasePublication user={user} detail={detail} editing={!!draft} onDraft={setPublicationDraft} />}</fieldset>
-      {detail.analysisLimitations.length > 0 && <details className="mt-5 border-t pt-4"><summary className="min-h-11 cursor-pointer text-sm font-bold">Existing analysis limitations</summary>{detail.analysisLimitations.map((analysis, i) => <div key={i} className="mt-3 text-xs"><p>{analysis.current ? "Current analysis" : "Historical analysis; not current"} · {analysis.completedAt && formatTime(analysis.completedAt)}</p><ul className="mt-2 list-disc space-y-1 pl-4">{analysis.limitations.map((value, j) => <li key={j}>{value}</li>)}</ul></div>)}<p className="mt-3 text-xs">Analysis is not human verification or a fire-spread forecast.</p></details>}
+      {!resource.failed && <CaseExposure detail={detail} />}
+      <CaseAnalysis user={user} detail={detail} disabled={resource.failed || resource.loading || !!draft || evidenceDraft.pending || assignmentDraft.pending || publicationDraft.pending} onDraft={setAnalysisDraft} />
       <p className="mt-4 border-t pt-3 text-xs text-muted-foreground">Internal coordinates and perimeter stay private until explicitly approved for publication.</p>
     </>}
   </section>;

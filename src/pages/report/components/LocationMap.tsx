@@ -33,7 +33,7 @@ export function LocationMap({ latitude, longitude, disabled, onPick }: { latitud
     if (!map.current) return;
     const lat = Number(latitude), lng = Number(longitude);
     if (!latitude.trim() || !longitude.trim() || !Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) { marker.current?.remove(); marker.current = null; return; }
-    marker.current ??= new Marker({ color: "#294d36" });
+    marker.current ??= new Marker({ color: getComputedStyle(document.documentElement).getPropertyValue("--color-primary").trim() });
     marker.current.setLngLat([lng, lat]).addTo(map.current);
     map.current.jumpTo({ center: [lng, lat] });
   }, [latitude, longitude, attempt]);

@@ -8,7 +8,8 @@ export default function OperationsAccessWaterPage() {
   const resource = useMonitoringAccessWater(user);
   return <OperationsSectionPage title="Access & Water" description="Review verified route and water-source conditions without inferred availability." icon={Route} resource={resource} section="access-water">{(data, refresh) => {
     const access = data.features.filter(item => item.kind === "ROAD");
-    const water = data.features.filter(item => item.kind !== "ROAD");
+    const water = data.features.filter(item => ["RIVER", "WATER_SOURCE"].includes(item.kind));
+    const designated = data.features.filter(item => item.kind === "DESIGNATED_LOCATION");
     return <>
       <section aria-labelledby="access-water-inventory-title" className={`overflow-hidden ${panelClass}`}>
         <div id="access-water-inventory-title"><InventoryHeader title="Access and water inventory" detail={`${data.counts.passableAccess}/${data.counts.access} verified access passable · ${data.counts.availableWater}/${data.counts.water} verified water available`} icon={Route} action={<OperationsDialog title="Create condition update" action="Create"><ConditionCreate operations={data} subjectType="FEATURE" refresh={refresh} /></OperationsDialog>} /></div>
@@ -17,6 +18,7 @@ export default function OperationsAccessWaterPage() {
           <section aria-labelledby="water-title"><h3 id="water-title" className="px-5 py-4 text-sm font-extrabold">Water</h3>{!water.length ? <EmptyPanel>No water features are recorded.</EmptyPanel> : <ul className="divide-y divide-primary/10">{water.map(item => <li key={item.id} className="grid gap-3 px-5 py-4 sm:grid-cols-[1fr_auto]"><div><p className="font-extrabold">{item.name || "Unnamed water source"}</p><p className="mt-1 text-xs text-muted-foreground">{item.provider} · {item.authoritative ? "Verified source" : "Not authoritative for operational use"}</p><div className="mt-2"><Condition condition={item.latestCondition} sample={item.sample} /></div></div><div className="space-y-3"><Freshness observedAt={item.latestObservedAt} /><OperationsDialog title={`Edit condition: ${item.name || item.id}`} action="Edit"><ConditionCreate operations={data} subjectType="FEATURE" initialSubjectId={item.id} refresh={refresh} /></OperationsDialog></div></li>)}</ul>}</section>
         </div>
       </section>
+      <section aria-label="Authority-designated locations" className={`${panelClass} mt-5 p-5`}><h2 className="font-extrabold">Authority-designated locations</h2><p className="mt-2 text-sm">Recorded locations are not guaranteed safe points. Current field or official-source conditions are required before referencing them in a warning.</p>{!designated.length ? <EmptyPanel>No designated locations are recorded.</EmptyPanel> : <ul className="divide-y">{designated.map(item => <li key={item.id} className="space-y-3 py-4"><h3 className="font-bold">{item.name || "Unnamed designated location"}</h3><p className="text-xs">{item.provider} · {item.authoritative ? "Verified source" : "Not authoritative"}</p><Condition condition={item.latestCondition} sample={item.sample} /><Freshness observedAt={item.latestObservedAt} /><OperationsDialog title={`Edit condition: ${item.name || item.id}`} action="Edit"><ConditionCreate operations={data} subjectType="FEATURE" initialSubjectId={item.id} refresh={refresh} /></OperationsDialog></li>)}</ul>}</section>
       <OperationsSnapshot data={data} />
     </>;
   }}</OperationsSectionPage>;

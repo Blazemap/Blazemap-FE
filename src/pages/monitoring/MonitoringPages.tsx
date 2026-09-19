@@ -29,7 +29,19 @@ function sourceState(status: SourceHealth["sources"][number]["status"]) {
   if (status === "STALE") return { label: "Stale", tone: "warning" as const };
   if (status === "NOT_CONFIGURED") return { label: "Not configured", tone: "neutral" as const };
   if (status === "NOT_SYNCED") return { label: "Not synced", tone: "warning" as const };
+  if (status === "OBSOLETE") return { label: "Superseded", tone: "neutral" as const };
   return { label: "Unavailable", tone: "danger" as const };
+}
+
+export function SourceHealthRow({ source }: { source: SourceHealth["sources"][number] }) {
+  const state = sourceState(source.status);
+  const message = source.message && !/(?:[a-z][a-z0-9+.-]*:\/\/|www\.|(?:token|password|secret|api[_-]?key)\s*[=:])/i.test(source.message) ? source.message : null;
+  return <li className="space-y-2 py-4">
+    <div className="flex items-center justify-between gap-4"><span className="text-sm font-bold">{source.name}</span><StatusPill tone={state.tone}>{state.label}</StatusPill></div>
+    {message && <p className="text-xs leading-5 text-muted-foreground">{message}</p>}
+    <p className="text-xs text-muted-foreground">{source.lastSuccessAt ? <>Last successful sync: <time dateTime={source.lastSuccessAt}>{formatTime(source.lastSuccessAt)}</time></> : "No successful sync recorded."}</p>
+    {source.id === "BMKG" && attentionStatuses.has(source.status) && <p className="text-xs leading-5"><Link to="/monitoring/cases" className="font-extrabold text-primary underline">Open a case</Link>, choose a verified ADM4 mapping under BMKG forecast region, then Save forecast region. If none are listed, ask the data administrator to import and verify mappings. The source worker or cron must then run BMKG sync; refreshing this page only reloads status.</p>}
+  </li>;
 }
 
 function summaryCharts(data: NonNullable<ReturnType<typeof useMonitoringSummary>["data"]>) {
@@ -42,16 +54,17 @@ function summaryCharts(data: NonNullable<ReturnType<typeof useMonitoringSummary>
     { label: "High", value: data.cases.byPriority.HIGH, color: "#b85c3c" },
     { label: "Medium", value: data.cases.byPriority.MEDIUM, color: "#d5a447" },
     { label: "Low", value: data.cases.byPriority.LOW, color: "#6f9878" },
-    { label: "Unassessed", value: data.cases.byPriority.UNASSESSED, color: "#a9b6aa" },
+    { label: "Unassessed", value: data.cases.byPriority.UNASSESSED, color: "#78716c" },
   ];
   const reports: ChartPart[] = [
     { label: "Awaiting review", value: data.reports.byReviewStatus.NEW, color: "#d49a36" },
-    { label: "Under review", value: data.reports.byReviewStatus.UNDER_REVIEW, color: "#547d63" },
-    { label: "Needs details", value: data.reports.byReviewStatus.NEEDS_DETAILS, color: "#799b7f" },
+    { label: "Under review", value: data.reports.byReviewStatus.UNDER_REVIEW, color: "var(--color-primary)" },
+    { label: "Needs details", value: data.reports.byReviewStatus.NEEDS_DETAILS, color: "#b45309" },
     { label: "Reviewed", value: data.reports.byReviewStatus.REVIEWED, color: "#254f39" },
-    { label: "Declined", value: data.reports.byReviewStatus.DECLINED, color: "#a9b6aa" },
+    { label: "Declined", value: data.reports.byReviewStatus.DECLINED, color: "#78716c" },
   ];
-  const handling: ChartPart[] = Object.entries(data.cases.byHandling).map(([status, value], index) => ({ label: handlingLabels[status as keyof typeof handlingLabels], value, color: ["#274f39", "#4c7558", "#70947a", "#d85d3f", "#d5a447", "#a9b6aa"][index] }));
+  const handlingColors: Record<keyof typeof handlingLabels, string> = { OPEN: "var(--color-primary)", CHECK_SCHEDULED: "#b45309", ON_SCENE: "#1d4ed8", RESPONDING: "#be123c", MONITORING: "#7c3aed", CLOSED: "#15803d" };
+  const handling: ChartPart[] = Object.entries(data.cases.byHandling).map(([status, value]) => ({ label: handlingLabels[status as keyof typeof handlingLabels], value, color: handlingColors[status as keyof typeof handlingLabels] }));
   return { verification, priority, reports, handling };
 }
 
@@ -86,7 +99,8 @@ export function OverviewPage() {
     {(summary.initialLoading || charts) && <section className="mt-7"><SectionHeading title="Operational distribution" description="Whole-system current-state counts from one backend snapshot." aside={<BarChart3 size={20} aria-hidden="true" className="text-primary" />} />
 {summary.initialLoading && !summary.data ? <DistributionSkeleton /> : charts && <div className="grid gap-5 xl:grid-cols-2 2xl:grid-cols-4"><DonutChart title="Case verification" subtitle="All stored cases" total={summary.data!.cases.total} parts={charts.verification} href="/monitoring/cases" /><BarChart title="Open-case priority" subtitle="Closed cases excluded" parts={charts.priority} href="/monitoring/cases" /><BarChart title="Case handling" subtitle="All handling states" parts={charts.handling} href="/monitoring/cases" /><BarChart title="Report workflow" subtitle="All citizen reports" parts={charts.reports} href="/monitoring/reports" /></div>}
 </section>}
-    <div className="mt-7 grid items-start gap-5 xl:grid-cols-[1.25fr_0.75fr]"><section className={`overflow-hidden ${panelClass}`}><header className="flex items-end justify-between gap-4 border-b border-primary/10 px-5 py-4 sm:px-6"><div><h2 className="text-base font-extrabold">Priority report queue</h2><p className="mt-1 text-xs text-muted-foreground">Highest priority among the latest reports.</p></div><Link to="/monitoring/reports" className="text-xs font-extrabold text-primary hover:underline">View reports</Link></header>{reports.initialLoading && !reports.data ? <QueueSkeleton /> : !queue.length ? <EmptyPanel>No reports are available.</EmptyPanel> : <ol className="divide-y divide-primary/10">{queue.map(report => { const appearance = triageAppearance[report.triage.level]; return <li key={report.id}><Link to={`/monitoring/reports/${encodeURIComponent(report.id)}`} className="grid gap-4 px-5 py-4 hover:bg-secondary/30 sm:grid-cols-[1fr_auto] sm:px-6"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="text-sm font-extrabold">{report.number}</span><span className="rounded-full px-2 py-0.5 text-xs font-extrabold" style={{ color: appearance.color, backgroundColor: `${appearance.color}12` }}>{appearance.label}</span><span className="text-xs text-muted-foreground">{reportStatusLabel(report)}</span></div><p className="mt-2 line-clamp-2 text-sm leading-6">{report.description}</p><p className="mt-2 truncate text-xs text-muted-foreground">{reportLocation(report)} · {formatTime(report.observedAt)}</p></div><div className="flex gap-1">{report.observationTypes.map(type => <img key={type} src={`/icons8-${observationAppearance[type].icon}.png`} alt={observationAppearance[type].label} width={26} height={26} className="size-6 object-contain" />)}</div></Link></li>; })}</ol>}</section><section className={`${panelClass} p-5 sm:p-6`}><h2 className="text-base font-extrabold">Source health</h2><p className="mt-1 text-xs text-muted-foreground">Latest independent availability states.</p>{health.initialLoading && !health.data ? <HealthSkeleton /> : <ul className="mt-5 divide-y divide-primary/10">{health.data?.sources.map(source => { const state = sourceState(source.status); return <li key={source.id} className="flex items-center justify-between gap-4 py-4"><span className="text-sm font-bold">{source.name}</span><StatusPill tone={state.tone}>{state.label}</StatusPill></li>; })}<li className="flex items-center justify-between gap-4 py-4"><span className="text-sm font-bold">Database</span><StatusPill tone={health.data?.database === "connected" ? "success" : "danger"}>{health.data?.database === "connected" ? "Connected" : "Unavailable"}</StatusPill></li></ul>}</section></div>
+    <div className="mt-7 grid items-start gap-5 xl:grid-cols-[1.25fr_0.75fr]"><section className={`overflow-hidden ${panelClass}`}><header className="flex items-end justify-between gap-4 border-b border-primary/10 px-5 py-4 sm:px-6"><div><h2 className="text-base font-extrabold">Priority report queue</h2><p className="mt-1 text-xs text-muted-foreground">Highest priority among the latest reports.</p></div><Link to="/monitoring/reports" className="text-xs font-extrabold text-primary hover:underline">View reports</Link></header>{reports.initialLoading && !reports.data ? <QueueSkeleton /> : !queue.length ? <EmptyPanel>No reports are available.</EmptyPanel> : <ol className="divide-y divide-primary/10">{queue.map(report => { const appearance = triageAppearance[report.triage.level]; return <li key={report.id}><Link to={`/monitoring/reports/${encodeURIComponent(report.id)}`} className="grid gap-4 px-5 py-4 hover:bg-secondary/30 sm:grid-cols-[1fr_auto] sm:px-6"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="text-sm font-extrabold">{report.number}</span><span className="rounded-full px-2 py-0.5 text-xs font-extrabold" style={{ color: appearance.color, backgroundColor: `${appearance.color}12` }}>{appearance.label}</span><span className="text-xs text-muted-foreground">{reportStatusLabel(report)}</span></div><p className="mt-2 line-clamp-2 text-sm leading-6">{report.description}</p><p className="mt-2 truncate text-xs text-muted-foreground">{reportLocation(report)} · {formatTime(report.observedAt)}</p></div><div className="flex gap-1">{report.observationTypes.map(type => <img key={type} src={`/icons8-${observationAppearance[type].icon}.png`} alt={observationAppearance[type].label} width={26} height={26} className="size-6 object-contain" />)}</div></Link></li>; })}</ol>}</section>
+<section className={`${panelClass} p-5 sm:p-6`}><h2 className="text-base font-extrabold">Source health</h2><p className="mt-1 text-xs text-muted-foreground">Latest independent availability states.</p>{health.initialLoading && !health.data ? <HealthSkeleton /> : <ul className="mt-5 divide-y divide-primary/10">{health.data?.sources.map(source => <SourceHealthRow key={source.id} source={source} />)}<li className="flex items-center justify-between gap-4 py-4"><span className="text-sm font-bold">Database</span><StatusPill tone={health.data?.database === "connected" ? "success" : "danger"}>{health.data?.database === "connected" ? "Connected" : "Unavailable"}</StatusPill></li></ul>}</section></div>
   </>;
 }
 

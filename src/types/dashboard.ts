@@ -92,7 +92,7 @@ export type MonitoringOperations = {
   asOf: string;
   teams: (OperationalSubject & { name: string; organization: string | null; activeAssignmentCount: number })[];
   equipment: (OperationalSubject & { name: string; kind: string; teamId: string | null })[];
-  features: { id: string; name: string | null; kind: "ROAD" | "RIVER" | "WATER_SOURCE"; provider: string; verifiedAt: string | null; authoritative: boolean; sample: boolean; latestCondition: string | null; latestObservedAt: string | null }[];
+  features: { id: string; name: string | null; kind: "ROAD" | "RIVER" | "WATER_SOURCE" | "DESIGNATED_LOCATION"; provider: string; verifiedAt: string | null; authoritative: boolean; sample: boolean; latestCondition: string | null; latestObservedAt: string | null }[];
   updates: { id: string; subjectType: "TEAM" | "EQUIPMENT" | "FEATURE"; subjectId: string; condition: string; source: string; observedAt: string; notes: string | null; createdAt: string; sample: boolean }[];
   assignments: { id: string; caseId: string; caseNumber: string; caseTitle: string; caseVerification: string; caseHandling: string; teamId: string; teamName: string; status: "ASSIGNED" | "ACCEPTED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED"; notes: string | null; version: number; sample: boolean; createdAt: string; updatedAt: string }[];
   counts: { teams: number; availableTeams: number; equipment: number; availableEquipment: number; activeAssignments: number; access: number; passableAccess: number; water: number; availableWater: number };

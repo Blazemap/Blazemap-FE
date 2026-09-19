@@ -1,4 +1,4 @@
-export { default as brandLogo } from "./images/blazemap-logo-transparent.png";
+export const brandLogo = "/logo.png";
 export { default as governmentForest } from "./images/government-forest.webp";
 export { default as loginForest } from "./images/login-forest.webp";
 export { default as registerForest } from "./images/register-forest.webp";

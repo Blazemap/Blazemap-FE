@@ -15,6 +15,7 @@ const navigation: NavigationItem[] = [
   { label: "Reports", href: "/monitoring/reports", icon: ListChecks },
   { label: "Cases", href: "/monitoring/cases", icon: ShieldAlert },
   { label: "Operations", href: "/monitoring/operations", icon: ClipboardList },
+  { label: "Warnings", href: "/monitoring/warnings", icon: ShieldAlert },
   { label: "Users", href: "/monitoring/users", icon: UsersRound },
 ];
 

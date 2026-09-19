@@ -40,7 +40,7 @@ function Profile({ initial }: { initial: DashboardUser }) {
   const errors = validatePasswordChange(values);
   return <><DraftGuard dirty={dirtyName || dirtyPassword || photo.dirty} pending={pending} />
     <div className="relative isolate min-h-[calc(100dvh-80px)] overflow-hidden bg-white lg:min-h-[calc(100dvh-88px)]">
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden bg-forest"><picture className="absolute inset-0 block"><source media="(max-width: 640px)" srcSet={rainforestSmall} /><img src={rainforest} alt="" className="size-full object-cover object-[50%_58%] opacity-70" decoding="async" /></picture><div className="absolute inset-x-0 top-0 h-48 bg-linear-to-b from-background from-30% to-transparent sm:h-56" /></div>
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden bg-[#173b2b]"><picture className="absolute inset-0 block"><source media="(max-width: 640px)" srcSet={rainforestSmall} /><img src={rainforest} alt="" className="size-full object-cover object-[50%_58%] opacity-70" decoding="async" /></picture><div className="absolute inset-x-0 top-0 h-48 bg-linear-to-b from-background from-30% to-transparent sm:h-56" /></div>
       <div className="relative mx-auto min-h-[calc(100dvh-80px)] w-full max-w-5xl px-4 py-10 sm:px-6 sm:py-12 lg:min-h-[calc(100dvh-88px)]">
       <h1 className="mb-7 text-3xl font-extrabold tracking-tight text-forest">Account settings</h1>
       <div className="grid items-start gap-4 sm:gap-6 md:grid-cols-[220px_minmax(0,1fr)]">

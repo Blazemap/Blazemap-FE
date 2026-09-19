@@ -89,7 +89,7 @@ export async function getCaseDetail(id: string, signal?: AbortSignal): Promise<C
   const item = parseCases({ data: [raw], meta: { total: 1, page: 1, pageSize: 1 } }).items[0];
   if (item.id !== id) throw new GovernmentError("Case response does not match", 502);
   const region = raw.region == null ? null : object(raw.region);
-  return { ...item, regionId: raw.regionId == null ? null : text(raw.regionId), region: region ? { id: text(region.id), name: text(region.name) } : null, operatorAuthorityConfigured: raw.operatorAuthorityConfigured === true, activeAssignmentCount: raw.activeAssignmentCount === undefined ? 0 : integer(raw.activeAssignmentCount, 0), windContext: parseWindContext(raw.windContext), version: integer(raw.version), perimeter: raw.perimeter == null ? null : parsePolygon(raw.perimeter), perimeterObservedAt: nullableTime(raw.perimeterObservedAt), perimeterSource: raw.perimeterSource == null ? null : text(raw.perimeterSource), perimeterRevision: integer(raw.perimeterRevision, 0), areaHectares: raw.areaHectares == null ? null : distance(raw.areaHectares),
+  return { ...item, weatherReference: raw.weatherReference == null ? null : parseWeatherReference(raw.weatherReference), regionId: raw.regionId == null ? null : text(raw.regionId), region: region ? { id: text(region.id), name: text(region.name) } : null, operatorAuthorityConfigured: raw.operatorAuthorityConfigured === true, activeAssignmentCount: raw.activeAssignmentCount === undefined ? 0 : integer(raw.activeAssignmentCount, 0), windContext: parseWindContext(raw.windContext), version: integer(raw.version), perimeter: raw.perimeter == null ? null : parsePolygon(raw.perimeter), perimeterObservedAt: nullableTime(raw.perimeterObservedAt), perimeterSource: raw.perimeterSource == null ? null : text(raw.perimeterSource), perimeterRevision: integer(raw.perimeterRevision, 0), areaHectares: raw.areaHectares == null ? null : distance(raw.areaHectares),
     fieldUpdates: list(raw.fieldUpdates).map(value => {
       const f = object(value), findings = text(f.findings);
       if (!["VISIBLE_FIRE", "SMOKE_ONLY", "NO_INDICATION", "INCONCLUSIVE", "UNREACHABLE"].includes(findings)) throw new GovernmentError("Invalid field finding", 502);
@@ -102,12 +102,63 @@ export async function getCaseDetail(id: string, signal?: AbortSignal): Promise<C
       if (!["HIGH", "MEDIUM", "LOW", "UNASSESSED"].includes(from) || !["HIGH", "MEDIUM", "LOW", "UNASSESSED"].includes(to)) throw new GovernmentError("Invalid priority history", 502);
       return { id: text(entry.id), from: from as CaseDetail["priorityHistory"][number]["from"], to: to as CaseDetail["priorityHistory"][number]["to"], reason: entry.reason == null ? null : text(entry.reason), changedAt: time(entry.changedAt), changedBy: text(entry.changedBy) };
     }),
+    exposure: raw.exposure == null ? null : parseExposure(raw.exposure),
+    contextRevision: integer(raw.contextRevision),
+    analyses: list(raw.analyses ?? []).map(value => {
+      const a = object(value), status = text(a.status), revision = integer(a.contextRevision);
+      if (!["RUNNING", "SUCCEEDED", "FAILED", "OBSOLETE"].includes(status)) throw new GovernmentError("Invalid analysis status", 502);
+      const o = a.output == null ? null : object(a.output);
+      if (status === "SUCCEEDED" && !o) throw new GovernmentError("Missing analysis output", 502);
+      if (o && (o.caseId !== id || o.contextRevision !== revision || !["LOW", "MODERATE", "HIGH", "INSUFFICIENT_DATA"].includes(text(o.evidenceLevel)) || !["LOW", "MODERATE", "HIGH", "INSUFFICIENT_DATA"].includes(text(o.impactLevel)) || !["LOW", "MEDIUM", "HIGH", "UNASSESSED"].includes(text(o.suggestedPriority)))) throw new GovernmentError("Invalid analysis context", 502);
+      return { sources: list(a.sources ?? []).map(value => { const s = object(value); return { id: text(s.id), group: text(s.group), facts: Object.fromEntries(Object.entries(object(s.facts)).map(([k, v]) => [k, text(v)])) }; }), id: text(a.id), contextRevision: revision, status, current: status === "SUCCEEDED" && a.id === raw.latestAnalysisId && revision === raw.contextRevision, startedAt: time(a.startedAt), completedAt: nullableTime(a.completedAt), failureCode: a.failureCode == null ? null : text(a.failureCode), schemaVersion: a.schemaVersion == null ? null : text(a.schemaVersion), promptVersion: a.promptVersion == null ? null : text(a.promptVersion), ruleVersion: a.ruleVersion == null ? null : text(a.ruleVersion), output: o ? {
+        caseId: text(o.caseId), contextRevision: revision, evidenceLevel: text(o.evidenceLevel), impactLevel: text(o.impactLevel), suggestedPriority: o.suggestedPriority as CaseDetail["priority"], model: text(o.model), generatedAt: time(o.generatedAt),
+        reasons: list(o.reasons).map(value => { const r = object(value); return { text: text(r.text), sourceIds: strings(r.sourceIds) }; }),
+        monitoringAreas: list(o.monitoringAreas).map(value => { const r = object(value); return { name: text(r.name), reason: text(r.reason), sourceIds: strings(r.sourceIds) }; }),
+        missingInformation: strings(o.missingInformation), suggestedChecks: strings(o.suggestedChecks), limitations: strings(o.limitations),
+      } : null };
+    }),
     analysisLimitations: list(raw.analyses ?? []).flatMap(value => {
       const a = object(value);
       if (a.status !== "SUCCEEDED" || !a.output || typeof a.output !== "object") return [];
       return [{ completedAt: nullableTime(a.completedAt), current: a.id === raw.latestAnalysisId && a.contextRevision === raw.contextRevision, limitations: strings(object(a.output).limitations) }];
     }),
   };
+}
+export function parseExposure(value: unknown): NonNullable<CaseDetail["exposure"]> {
+  const e = object(value);
+  const bool = (v: unknown) => { if (typeof v !== "boolean") throw new GovernmentError("Invalid exposure state", 502); return v; };
+  return { evaluatedAt: time(e.evaluatedAt), scope: text(e.scope), limited: bool(e.limited), limitation: text(e.limitation), items: list(e.items).map(value => {
+    const f = object(value), d = f.designation == null ? null : object(f.designation), c = f.condition == null ? null : object(f.condition);
+    return { id: text(f.id), name: f.name == null ? null : text(f.name), kind: text(f.kind), provider: text(f.provider), license: text(f.license), attribution: text(f.attribution), sourceDate: time(f.sourceDate), verifiedAt: nullableTime(f.verifiedAt), distanceMeters: f.distanceMeters == null ? null : distance(f.distanceMeters), intersectsPoint: f.intersectsPoint == null ? null : bool(f.intersectsPoint), downwind: f.downwind == null ? null : bool(f.downwind), unavailableReason: f.unavailableReason == null ? null : text(f.unavailableReason), designation: d ? { authority: text(d.authority), reference: text(d.reference), verifiedAt: time(d.verifiedAt) } : null, condition: c ? { condition: text(c.condition), source: text(c.source), observedAt: time(c.observedAt), stale: bool(c.stale) } : null };
+  }) };
+}
+export async function requestCaseAnalysis(id: string) {
+  await governmentRequest(`${apiEndpoints.cases}/${encodeURIComponent(id)}/analyze`, "post", {});
+}
+export async function createCaseFromReport(id: string, reason: string) {
+  const value = object(object(await governmentRequest(`${apiEndpoints.adminReports}/${encodeURIComponent(id)}/case`, "post", { reason })).data);
+  return { id: text(value.id), number: text(value.number) };
+}
+export async function getReportCandidates(id: string, maxDistanceMeters: number, hours: number, signal?: AbortSignal, kind: "reports" | "hotspots" = "reports") {
+  const params = new URLSearchParams({ maxDistanceMeters: String(maxDistanceMeters), hours: String(hours) });
+  const response = object(await governmentRequest(`${apiEndpoints.adminReports.replace(/reports$/, kind)}/${encodeURIComponent(id)}/candidates?${params}`, "get", undefined, signal));
+  const meta = object(response.meta);
+  if (typeof meta.eligible !== "boolean" || meta.automaticAssociation !== false) throw new GovernmentError("Invalid candidate response", 502);
+  return { eligible: meta.eligible, limitation: text(meta.limitation), items: list(response.data).map(value => {
+    const c = object(value);
+    return { id: text(c.id), number: text(c.number), title: text(c.title), distanceMeters: distance(c.distanceMeters), timeDifferenceHours: distance(c.timeDifferenceHours), matchedObservationId: text(c.matchedObservationId), matchedObservedAt: time(c.matchedObservedAt) };
+  }) };
+}
+export async function associateGovernmentHotspot(id: string, caseId: string | null, reason: string) {
+  const path = `${apiEndpoints.adminReports.replace(/reports$/, "hotspots")}/${encodeURIComponent(id)}`;
+  await governmentRequest(caseId ? path : `${path}/case`, caseId ? "patch" : "post", caseId ? { caseId, reason } : { reason });
+}
+export function parseWeatherReference(value: unknown): NonNullable<CaseDetail["weatherReference"]> {
+  const r = object(value), location = object(r.location);
+  if (r.relationBasis !== "WEATHER_REFERENCE" || r.provider !== "BMKG" || !/^\d{2}\.\d{2}\.\d{2}\.\d{4}$/.test(text(r.adm4))) throw new GovernmentError("Invalid weather reference", 502);
+  const lat = number(location.lat), lon = number(location.lon);
+  if (Math.abs(lat) > 90 || Math.abs(lon) > 180) throw new GovernmentError("Invalid representative point", 502);
+  return { relationBasis: "WEATHER_REFERENCE", provider: "BMKG", adm4: text(r.adm4), locationFingerprint: text(r.locationFingerprint), fetchedAt: time(r.fetchedAt), location: { desa: text(location.desa), kecamatan: text(location.kecamatan), kotkab: text(location.kotkab), provinsi: text(location.provinsi), lat, lon }, forecasts: list(r.forecasts).map(value => { const f = object(value); return { issuedAt: time(f.issuedAt), validAt: time(f.validAt), temperature: f.temperature == null ? null : number(f.temperature), humidity: f.humidity == null ? null : number(f.humidity), windSpeed: f.windSpeed == null ? null : distance(f.windSpeed), weatherDescriptionEn: f.weatherDescriptionEn == null ? null : text(f.weatherDescriptionEn) }; }) };
 }
 export async function getForecastRegions(signal?: AbortSignal): Promise<ForecastRegion[]> {
   const response = object(await governmentRequest(`${apiEndpoints.adminRegions}?bmkgMapped=true`, "get", undefined, signal));

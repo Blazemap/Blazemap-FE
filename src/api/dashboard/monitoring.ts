@@ -114,7 +114,7 @@ export function parseMonitoringOperations(value: unknown): MonitoringOperations 
   if (!Array.isArray(data.teams) || !Array.isArray(data.equipment) || !Array.isArray(data.features) || !Array.isArray(data.updates) || !Array.isArray(data.assignments)) throw new Error("Invalid operations response");
   const features = data.features.map(value => {
     const item = record(value), kind = text(item.kind), sample = parseBoolean(item.sample), authoritative = parseBoolean(item.authoritative), verifiedAt = item.verifiedAt == null ? null : time(item.verifiedAt);
-    if (!["ROAD", "RIVER", "WATER_SOURCE"].includes(kind) || authoritative !== (!sample && verifiedAt !== null)) throw new Error("Invalid operation feature authority");
+    if (!["ROAD", "RIVER", "WATER_SOURCE", "DESIGNATED_LOCATION"].includes(kind) || authoritative !== (!sample && verifiedAt !== null)) throw new Error("Invalid operation feature authority");
     return { id: text(item.id), name: parseNullable(item.name), kind: kind as MonitoringOperations["features"][number]["kind"], provider: text(item.provider), verifiedAt, authoritative, sample, latestCondition: condition(item.latestCondition), latestObservedAt: observedAt(item.latestObservedAt) };
   });
   const counts = record(data.counts);

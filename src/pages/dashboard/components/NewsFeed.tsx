@@ -1,4 +1,5 @@
 import { useState } from "react";
+import WarningBanner from "./WarningBanner";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui";
 import { useCitizenFeed, usePublications } from "@/hooks/dashboard/usePublications";
@@ -18,6 +19,7 @@ export default function NewsFeed({ user, news = true, hours = 48 }: { user: Dash
   const title = news ? "News" : "Feed";
   const items = query.items;
   return <FeedShell title={title} description={news ? "Completed government publications" : "Your reports and published confirmed incidents"} refreshing={query.isFetching} onRefresh={query.retry}>
+    {!news && <WarningBanner user={user} />}
     {query.isPending && <FeedRowsSkeleton citizen />}
     {(query.isError || query.forbidden) && <div role="alert" className="text-sm text-gray-600">{query.forbidden ? "Access unavailable. Previous results cleared." : `${title} could not refresh. Earlier results may be out of date.`}<Button variant="outline" disabled={query.isFetching} onClick={query.retry}>Retry</Button></div>}
     {!query.isPending && !query.isError && !query.forbidden && !items.length && <FeedEmpty>{news ? "No completed government publications have been published." : "No reports or published incidents yet."}</FeedEmpty>}

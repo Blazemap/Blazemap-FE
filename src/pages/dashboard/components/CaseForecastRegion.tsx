@@ -1,3 +1,4 @@
+import CaseWeatherReference from "./CaseWeatherReference";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { getForecastRegions, updateCaseForecastRegion } from "@/api/dashboard/government";
@@ -28,5 +29,6 @@ export default function CaseForecastRegion({ user, detail, refresh }: { user: Da
       {mutation.isError && <p role="alert" className="mt-2 text-xs text-red-800">The forecast region was not changed. Refresh and review the verified mapping before retrying.</p>}
       <Button type="submit" variant="outline" className="mt-3" disabled={!changed || reason.trim().length < 5 || mutation.isPending}>{mutation.isPending ? "Saving…" : "Save forecast region"}</Button>
     </form>}
+    <CaseWeatherReference key={`${detail.id}-${detail.version}`} user={user} detail={detail} refresh={refresh} />
   </section>;
 }

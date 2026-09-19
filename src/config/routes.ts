@@ -73,6 +73,7 @@ export const routes: RouteObject[] = [
       { index: true, lazy: async () => ({ Component: (await import("@/pages/monitoring")).OverviewPage }) },
       { path: "reports", lazy: async () => ({ Component: (await import("@/pages/monitoring")).ReportsPage }), children: [{ path: ":id", lazy: async () => ({ Component: (await import("@/pages/monitoring")).ReportDetailPage }) }] },
       { path: "cases", lazy: async () => ({ Component: (await import("@/pages/monitoring")).CasesPage }), children: [{ path: ":id", lazy: async () => ({ Component: (await import("@/pages/monitoring")).CaseDetailPage }) }] },
+      { path: "warnings", lazy: async () => ({ Component: (await import("@/pages/monitoring/WarningsPage")).default }) },
       { path: "operations", children: [
         { index: true, lazy: async () => { const [dashboard, monitoring] = await Promise.all([import("@/pages/dashboard"), import("@/pages/monitoring")]); return { Component: monitoring.OperationsPage, loader: dashboard.loader }; } },
         { path: "teams", lazy: async () => { const [dashboard, monitoring] = await Promise.all([import("@/pages/dashboard"), import("@/pages/monitoring")]); return { Component: monitoring.OperationsTeamsPage, loader: dashboard.loader }; } },

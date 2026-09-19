@@ -209,7 +209,7 @@ export default function ReportPage({ open = true, onClose, onRestoreFocus, onPic
                       <label htmlFor="photos" className="mt-4 flex h-24 w-full cursor-pointer flex-col items-center justify-center rounded-sm border-2 border-dashed border-input bg-secondary/35 text-muted-foreground transition-colors focus-within:ring-2 focus-within:ring-primary hover:border-primary/40 hover:bg-secondary/60"><ImagePlus size={24} aria-hidden="true" /><span className="mt-2 text-sm font-bold">Add photos</span><input id="photos" type="file" multiple accept="image/jpeg,image/png,image/webp" aria-describedby="photo-help" className="sr-only" onChange={handlePhotos} /></label>
                     </details>
 
-                    <section className="border-t border-primary/10 px-7 py-5"><div className="flex items-start gap-3"><ShieldCheck size={18} className="mt-0.5 shrink-0 text-emerald-700" aria-hidden="true" /><p className="text-xs leading-5 text-muted-foreground">Your identity, precise location and original photos are not published on the situation map.</p></div></section>
+                    <section className="border-t border-primary/10 px-7 py-5"><div className="flex items-start gap-3"><ShieldCheck size={18} className="mt-0.5 shrink-0 text-primary" aria-hidden="true" /><p className="text-xs leading-5 text-muted-foreground">Your identity, precise location and original photos are not published on the situation map.</p></div></section>
                   </fieldset>
                 </form>}
               </div>

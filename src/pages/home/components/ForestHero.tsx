@@ -42,7 +42,7 @@ export function ForestHero() {
         <motion.div aria-hidden="true" style={{ y: isReducedMotion ? 0 : nearY, x: isReducedMotion ? 0 : nearX }} className="pointer-events-none absolute left-3 bottom-3 z-10 aspect-[1000/667] h-[70%] max-w-[calc(100%_-_24px)]">
           <img src={foreground} width={1000} height={667} alt="" className="forest-foliage-edge forest-breeze h-full w-full object-contain object-left-bottom brightness-[0.8]" />
         </motion.div>
-        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-32 bg-linear-to-t from-forest/85 to-transparent" />
+        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-32 bg-linear-to-t from-[#173b2b]/85 to-transparent" />
         <div className="absolute inset-x-0 bottom-12 z-20 mx-auto flex w-full max-w-[1440px] items-center justify-between gap-4 px-[clamp(24px,5vw,80px)] text-xs font-semibold text-white sm:bottom-16">
           <span className="inline-flex items-center gap-2"><MapPin size={14} aria-hidden="true" />Kalimantan, Indonesia</span>
           <a href="#about" className="inline-flex min-h-11 items-center gap-2 underline-offset-4 hover:underline">Discover Blazemap <ArrowDown size={15} aria-hidden="true" /></a>

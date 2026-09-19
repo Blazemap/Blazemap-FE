@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import NewsFeed from "./NewsFeed";
+import WarningBanner from "./WarningBanner";
 import { usePublicationMap } from "@/hooks/dashboard/usePublicationMap";
 import MapLayers from "./MapLayers";
 import { Check, Crosshair, ListFilter, Plus, X } from "lucide-react";
@@ -133,6 +134,7 @@ export function CitizenDashboard({ user }: { user: DashboardUser }) {
     {!feed && <section aria-label="Situation map" className="absolute inset-0"><Suspense fallback={<MapSkeleton />}><SituationMap place={place} items={items} selected={selected} draftLocation={pick ?? reportLocation} onSelect={selectItem} onPick={pick ? (latitude, longitude) => setPick(current => current ? { ...current, latitude, longitude } : null) : undefined} ownReports={publications ? ownReports : []} selectedOwnReport={selectedOwnReport} onSelectOwnReport={selectOwnReport} /></Suspense></section>}
 
     {feed && <NewsFeed key={hours} user={user} news={false} hours={hours} />}
+    {!feed && !pick && !reportOpen && !myReportsOpen && !selected && <div className="absolute bottom-24 right-4 z-20 w-[min(360px,calc(100%-32px))]"><WarningBanner user={user} /></div>}
 
     {!feed && params.get("publication") && (publication.isPending || publication.isError || !publication.item) && <div role={publication.isError ? "alert" : "status"} className="absolute left-4 top-56 z-20 rounded-sm border bg-white p-4 text-sm sm:top-28">{publication.isPending ? "Loading published location…" : "Approved map location unavailable."}{publication.isError && <Button variant="outline" onClick={() => void publication.refetch()}>Retry</Button>}</div>}
     {!feed && availability && <p role={loaded.failed ? "alert" : "status"} className="absolute left-4 top-56 z-10 max-w-xs rounded-sm border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-950 sm:left-6 sm:top-28">{availability}</p>}

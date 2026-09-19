@@ -45,7 +45,7 @@ export default function ContactPage() {
         </motion.div>
 
         <motion.aside aria-labelledby="hours-title" style={{ y: isReducedMotion ? 0 : panelY }} className="w-full max-w-[360px] md:justify-self-end">
-          <motion.div initial={isReducedMotion ? false : { opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: isReducedMotion ? 0 : 0.8, delay: isReducedMotion ? 0 : 0.15, ease: [0.16, 1, 0.3, 1] }} className="rounded-2xl border border-background/70 bg-background/95 p-7 shadow-[0_24px_64px_-24px_rgba(23,59,43,0.4)] backdrop-blur-sm sm:p-8">
+          <motion.div initial={isReducedMotion ? false : { opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: isReducedMotion ? 0 : 0.8, delay: isReducedMotion ? 0 : 0.15, ease: [0.16, 1, 0.3, 1] }} className="rounded-2xl border border-background/70 bg-background/95 p-7 shadow-[0_24px_64px_-24px_rgba(67,25,31,0.4)] backdrop-blur-sm sm:p-8">
             <div className="flex items-center gap-3">
               <Clock3 size={23} strokeWidth={1.6} aria-hidden="true" className="shrink-0 text-primary" />
               <h2 id="hours-title" className="text-xl font-extrabold tracking-[-0.025em]">Office hours</h2>

@@ -63,7 +63,7 @@ export function AvatarEditor({ user, disabled, onSaved, onState }: { user: Dashb
   }
   return <div className="border-b border-primary/10 p-6">
     <div className="flex items-center gap-5">
-      <button ref={trigger} type="button" aria-label="Edit profile photo" disabled={disabled || saving || loading} onClick={() => file.current?.click()} className="group relative grid size-24 shrink-0 place-items-center rounded-full bg-emerald-50 text-primary ring-1 ring-primary/15 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">
+      <button ref={trigger} type="button" aria-label="Edit profile photo" disabled={disabled || saving || loading} onClick={() => file.current?.click()} className="group relative grid size-24 shrink-0 place-items-center rounded-full bg-secondary text-primary ring-1 ring-primary/15 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">
         {avatar.url ? <img src={avatar.url} alt="Current profile" referrerPolicy="no-referrer" className="size-full rounded-full object-cover" /> : <UserRound size={36} aria-hidden="true" />}
         <span className="absolute inset-0 grid place-items-center rounded-full bg-forest/50 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none"><Pencil size={22} aria-hidden="true" /></span>
         <span className="absolute -bottom-1 -right-1 grid size-9 place-items-center rounded-full border-2 border-white bg-primary text-white"><Pencil size={15} aria-hidden="true" /></span>
@@ -73,7 +73,7 @@ export function AvatarEditor({ user, disabled, onSaved, onState }: { user: Dashb
     </div>
     {loading && <div className="mt-3 flex items-center gap-3"><p role="status" className="text-sm">Opening image…</p><Button type="button" variant="ghost" onClick={cancel}>Cancel</Button></div>}
     {avatar.isError && <div className="mt-3 text-sm"><p role="alert">Your saved photo could not be loaded.</p><Button type="button" variant="ghost" onClick={() => void avatar.refetch()}>Retry photo</Button></div>}
-    {saved && <p role="status" className="mt-3 text-sm text-primary">Profile photo saved.</p>}
+    {saved && <p role="status" className="mt-3 text-sm text-emerald-800">Profile photo saved.</p>}
     {!image && error && <p role="alert" className="mt-3 text-sm text-red-800">{error}</p>}
     <Dialog.Root open={!!image} onOpenChange={open => { if (!open) cancel(); }}><Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-80 bg-forest/50" /><Dialog.Content onCloseAutoFocus={event => { event.preventDefault(); trigger.current?.focus(); }} onEscapeKeyDown={event => { if (saving) event.preventDefault(); }} onPointerDownOutside={event => event.preventDefault()} className="fixed left-1/2 top-1/2 z-90 max-h-[calc(100dvh-32px)] w-[calc(100%-32px)] max-w-md -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-white p-6 text-forest shadow-2xl">
       <Dialog.Title className="text-xl font-extrabold">Crop profile photo</Dialog.Title><Dialog.Description className="mt-2 text-sm text-muted-foreground">Drag to position, or use the sliders. Saved as a 512 × 512 image.</Dialog.Description>
