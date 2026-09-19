@@ -57,7 +57,7 @@ export default function VisionMissionPage() {
           className="mx-auto w-full max-w-[1440px] px-[clamp(24px,7vw,112px)] pb-16 pt-20 sm:pb-20 lg:pb-24"
         >
           <h1 id="vision-title" className="max-w-[13ch] text-[clamp(48px,7vw,94px)] font-extrabold leading-[0.98] tracking-[-0.055em]">
-            Clarity for every sign. <span className="text-sage">Care for every forest.</span>
+            Clarity for every sign. <span className="text-primary">Care for every forest.</span>
           </h1>
           <p className="mt-7 max-w-[58ch] text-base leading-8 text-white/82 sm:text-lg">
             Our vision is a Kalimantan where forest and land fire information is credible, traceable, and useful. Communities and authorized teams can act with better context, not assumptions.
@@ -112,9 +112,9 @@ export default function VisionMissionPage() {
         </div>
       </section>
 
-      <section aria-labelledby="commitment-title" className="relative isolate overflow-hidden bg-[#173b2b] text-white">
+      <section aria-labelledby="commitment-title" className="relative isolate overflow-hidden bg-forest text-white">
         <img src={rainforestSmall} width={768} height={512} alt="" aria-hidden="true" loading="lazy" className="absolute inset-0 -z-20 h-full w-full object-cover opacity-25" />
-        <div aria-hidden="true" className="absolute inset-0 -z-10 bg-[linear-gradient(105deg,rgba(23,59,43,1)_15%,rgba(23,59,43,0.9)_58%,rgba(41,77,54,0.6)_100%)]" />
+        <div aria-hidden="true" className="absolute inset-0 -z-10 bg-linear-to-r from-forest via-forest/90 to-primary/75" />
         <motion.div
           initial={isReducedMotion ? false : { opacity: 0, y: 24 }}
           whileInView={{ opacity: 1, y: 0 }}
