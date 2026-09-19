@@ -7,7 +7,7 @@ import ts from "typescript";
 import * as React from "react";
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
-const search = read("src/pages/dashboard/components/ObservationSearch.tsx");
+const search = read("src/pages/dashboard/components/PlaceSearch.tsx");
 const report = read("src/pages/report/ReportPage.tsx");
 const map = read("src/pages/dashboard/components/SituationMap.tsx");
 const citizen = read("src/pages/dashboard/components/CitizenDashboard.tsx");
@@ -18,8 +18,8 @@ const resource = read("src/hooks/dashboard/useDashboardResource.ts");
 const select = read("src/components/ui/select.tsx");
 
 for (const source of [search, reports]) for (const pattern of [/role="combobox"/, /role="listbox"/, /role="option"/, /ArrowDown/, /Enter/, /Escape/]) assert.match(source, pattern);
-assert.match(search, /items: MapItem\[\]/);
-assert.doesNotMatch(search, /apiClient|dangerouslySetInnerHTML|innerHTML/);
+assert.match(search, /items: Place\[\]/);
+assert.doesNotMatch(search, /dangerouslySetInnerHTML|innerHTML/);
 assert.match(reports, /reports: OwnReport\[\]/);
 assert.match(reports, /reports=\{reports\}/);
 assert.doesNotMatch(reports, /apiClient|dangerouslySetInnerHTML|innerHTML/);
@@ -38,8 +38,10 @@ assert.match(map, /draftLocation/);
 assert.match(map, /setDraggable\(!!onPick\)/);
 assert.match(map, /useEffect\(\(\) => \(\) => \{ pickMarker\.current\?\.remove\(\)/);
 for (const source of [citizen, dashboard]) {
-  assert.match(source, /draftLocation=\{pick \?\? reportLocation\}/);
-  assert.match(source, /onLocationChange=\{handleReportLocation\}/);
+  if (source === citizen) {
+    assert.match(source, /draftLocation=\{pick \?\? reportLocation\}/);
+    assert.match(source, /onLocationChange=\{handleReportLocation\}/);
+  }
   assert.match(source, /fallback=\{<MapSkeleton \/>\}/);
   assert.doesNotMatch(source, /fallback=\{<p role="status"[^>]*>Loading map/);
 }
@@ -48,7 +50,7 @@ const skeletons = read("src/pages/dashboard/components/DashboardSkeletons.tsx");
 function compile(source, react = React) {
   const exports = {};
   runInNewContext(ts.transpileModule(source, { compilerOptions: { jsx: ts.JsxEmit.React, module: ts.ModuleKind.CommonJS } }).outputText, {
-    exports, React: react, require: name => name === "react" ? react : name === "lucide-react" ? {} : { formatTime: value => value },
+    exports, React: react, require: name => name === "react" ? react : name === "lucide-react" ? { Search: () => null } : { formatTime: value => value },
   });
   return exports;
 }
@@ -58,36 +60,22 @@ function nodes(tree) {
   if (typeof tree.type === "function") return nodes(tree.type(tree.props));
   return [tree, ...nodes(tree.props?.children)];
 }
-function renderSearch({ loading = false, highlighted = 5, count = 6, query = "fire", focused = true, dismissed = false, top = 420, bottom = 496 } = {}) {
-  const effects = [], selections = [];
-  const states = [focused, dismissed, highlighted];
-  const scrolls = [];
-  const list = { clientTop: 0, clientHeight: 200, scrollTop: 0, getBoundingClientRect: () => ({ top: 100 }), scrollBy: options => scrolls.push(options.top), querySelector: () => ({ getBoundingClientRect: () => ({ top, bottom }) }) };
-  const refs = [{ blur() {} }, list];
-  const react = { ...React, useId: () => "test", useState: () => [states.shift(), () => {}], useRef: () => ({ current: refs.shift() }), useEffect: effect => effects.push(effect) };
-  const { ObservationSearch } = compile(search, react);
-  const tree = ObservationSearch({ id: "search", query, items: Array.from({ length: count }, (_, i) => ({ id: String(i), title: "Fire", time: "now" })), initialLoading: loading, onSelect: id => selections.push(id), onQueryChange() {} });
-  effects.forEach(effect => effect());
-  const rendered = nodes(tree);
+function renderSearch({ loading = false, highlighted = 1, count = 3, query = "Banten", open = true } = {}) {
+  const selections = [];
+  const states = [query, open, highlighted, { query: loading ? "old" : query, items: Array.from({ length: count }, (_, i) => ({ name: String(i), label: `Place ${i}`, latitude: 0, longitude: 114 })), error: false }];
+  const react = { ...React, useState: () => [states.shift(), () => {}], useRef: () => ({ current: 0 }), useEffect() {} };
+  const { PlaceSearch } = compile(search, react);
+  const rendered = nodes(PlaceSearch({ id: "search", side: "top", onSelect: place => selections.push(place.name) }));
   const input = rendered.find(node => node.props.role === "combobox");
   input.props.onKeyDown({ key: "Enter", preventDefault() {} });
   const active = input.props["aria-activedescendant"];
   assert.ok(!active || rendered.some(node => node.props.id === active && node.props.role === "option"), "active descendant must exist");
-  return { selections, scrolls };
+  return selections;
 }
-assert.deepEqual(renderSearch({ loading: true }).selections, [], "loading must not select hidden stale results");
-assert.deepEqual(renderSearch({ loading: true }).scrolls, []);
-assert.deepEqual(renderSearch().selections, ["5"]);
-assert.deepEqual(renderSearch().scrolls, [196], "scroll only the list by the nearest bottom edge");
-assert.deepEqual(renderSearch({ top: 80, bottom: 156 }).scrolls, [-20]);
-assert.deepEqual(renderSearch({ top: 120, bottom: 196 }).scrolls, []);
-for (const options of [{ count: 0 }, { query: " " }, { focused: false }, { dismissed: true }]) {
-  const result = renderSearch(options);
-  assert.deepEqual(result.selections, []);
-  assert.deepEqual(result.scrolls, []);
-}
-assert.doesNotMatch(search, /scrollIntoView\(/, "scrolling must stay inside the listbox");
-assert.doesNotMatch(search.split("function SearchResultsSkeleton")[1].split("function ObservationIcon")[0], /space-y-1|p-1\.5/);
+assert.deepEqual(renderSearch({ loading: true }), [], "loading must not select hidden stale results");
+assert.deepEqual(renderSearch(), ["1"]);
+assert.deepEqual(renderSearch({ highlighted: -1 }), ["0"]);
+for (const options of [{ count: 0 }, { query: " " }, { open: false }]) assert.deepEqual(renderSearch(options), []);
 const { FeedSkeleton, ObservationListSkeleton } = compile(skeletons);
 assert.doesNotMatch(ObservationListSkeleton().props.className, /\bp-4\b/);
 assert.match(dashboard, /className="p-4">[\s\S]*?<ObservationListSkeleton/);
@@ -105,8 +93,9 @@ assert.equal(staffFeed.filter(node => node.props.className?.includes("divide-y")
 const observationRows = nodes(ObservationListSkeleton()).filter(node => node.props.className?.includes("flex gap-3"));
 assert.equal(observationRows.length, 5);
 for (const row of observationRows) assert.match(row.props.className, /rounded-xl border border-primary\/10 bg-white p-4/);
-assert.match(citizen, /<FeedSkeleton variant="citizen" \/>/);
-assert.match(dashboard, /<FeedSkeleton \/>/);
+assert.match(citizen, /<NewsFeed user=\{user\}/);
+assert.match(read("src/pages/dashboard/components/NewsFeed.tsx"), /FeedRowsSkeleton/);
+assert.match(dashboard, /<FeedRowsSkeleton \/>/);
 const keyHandler = map.match(/element\.addEventListener\("keydown", event => \{([\s\S]*?)\n {6}\}\);/)[1];
 for (const [lat, lng, key, shiftKey, expected] of [
   [90, 180, "ArrowUp", false, [90, 180]], [-90, -180, "ArrowDown", true, [-90, -180]],

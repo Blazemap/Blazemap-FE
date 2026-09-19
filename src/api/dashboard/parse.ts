@@ -1,5 +1,7 @@
-import type { CasesData, DemoArea, Handling, MapData, MapItem, Verification } from "@/types";
+import type { CasesData, DemoArea, Handling, MapData, MapItem, OwnReport, Verification } from "@/types";
 import { parsePolygon, polygonArea, type PublicPerimeter } from "../../lib/perimeter.ts";
+import { parseGovernmentReports } from "./government.ts";
+import { parseWindContext } from "../../lib/wind.ts";
 
 function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid response");
@@ -44,6 +46,23 @@ function verification(value: unknown): Verification {
 function handling(value: unknown): Handling {
   return choice(value, ["OPEN", "CHECK_SCHEDULED", "ON_SCENE", "RESPONDING", "MONITORING", "CLOSED"]);
 }
+function ownReport(raw: unknown): OwnReport {
+  const item = record(raw);
+  const region = item.region === null ? null : record(item.region);
+  const linked = item.case === null ? null : record(item.case);
+  const observations: OwnReport["observationTypes"] = array(item.observationTypes).map(value => choice(value, ["SMOKE", "FLAME", "BURNING_SMELL"] as const));
+  const coordinates = point(item);
+  return {
+    id: text(item.id), number: text(item.number), observationTypes: observations, observedAt: date(item.observedAt), createdAt: date(item.createdAt),
+    locationMode: choice(item.locationMode, ["INCIDENT_ESTIMATE", "OBSERVER_POSITION"]), ...coordinates,
+    accuracyMeters: item.accuracyMeters == null ? null : number(item.accuracyMeters), locationDescription: text(item.locationDescription), description: text(item.description),
+    reviewStatus: choice(item.reviewStatus, ["NEW", "UNDER_REVIEW", "NEEDS_DETAILS", "REVIEWED", "DECLINED"]),
+    region: region ? { id: text(region.id), name: text(region.name), timezone: text(region.timezone) } : null,
+    case: linked ? { number: text(linked.number), verificationStatus: text(linked.verificationStatus), handlingStatus: text(linked.handlingStatus) } : null,
+    windContext: item.windContext === undefined ? undefined : parseWindContext(item.windContext),
+    attachments: array(item.attachments).map(value => { const attachment = record(value); return { id: text(attachment.id), filename: text(attachment.filename), size: number(attachment.size), contentType: text(attachment.contentType) }; }),
+  };
+}
 export function parseMap(body: unknown): MapData {
   const data = record(record(body).data);
   const source = record(data.sourceStatus);
@@ -66,8 +85,8 @@ export function parseMap(body: unknown): MapData {
       id: `publication:${text(item.publicationId)}`, kind: "publication", title: text(item.title),
       ...point(item, mode === "APPROVED_INCIDENT_POINT"), time: date(item.publishedAt), source: "Published case summary",
       location: mode === "NONE" ? "Location withheld" : array(item.regions).map((region) => text(record(region).name)).join(", ") || "Approved incident location",
-      publicLocationMode: mode, ...(publicPerimeter ? { publicPerimeter } : {}),
-      verification: verification(item.verificationStatus), handling: handling(item.handlingStatus), stale: false,
+       publicLocationMode: mode, ...(publicPerimeter ? { publicPerimeter } : {}), caseNumber: item.number === undefined ? undefined : text(item.number), windContext: item.windContext === undefined ? null : parseWindContext(item.windContext),
+       verification: verification(item.verificationStatus), handling: handling(item.handlingStatus), stale: false,
     };
   });
   for (const raw of hotspots) {
@@ -99,7 +118,11 @@ export function parseMap(body: unknown): MapData {
     if (!coordinates.length || coordinates.length > 100) throw new Error("Invalid demo polygon");
     return { id: text(area.id), name, geometry: { type: "Polygon", coordinates }, areaHectares, generatedAt: date(area.generatedAt), demo: true };
   });
-  return { items, demoAreas, sourceStatus, updatedAt: data.updatedAt === null ? null : date(data.updatedAt), lastSuccessAt: source.lastSuccessAt === undefined ? null : date(source.lastSuccessAt), limited: hotspots.length >= 2000 || cases.length >= 200 };
+  const ownReports = array(data.ownReports ?? []).map(ownReport);
+  const privateReports = parseGovernmentReports({ data: array(data.privateReports ?? []), meta: { total: array(data.privateReports ?? []).length, page: 1, pageSize: Math.max(1, Math.min(100, array(data.privateReports ?? []).length || 1)) } }).data;
+  const privateCases = parseCases({ data: array(data.privateCases ?? []), meta: { total: array(data.privateCases ?? []).length, page: 1, pageSize: Math.max(1, Math.min(100, array(data.privateCases ?? []).length || 1)) } }).items;
+  if (data.privateLimited !== undefined && typeof data.privateLimited !== "boolean") throw new Error("Invalid private map limit");
+  return { items, ownReports, privateReports, privateCases, privateLimited: data.privateLimited === true, demoAreas, sourceStatus, updatedAt: data.updatedAt === null ? null : date(data.updatedAt), lastSuccessAt: source.lastSuccessAt === undefined ? null : date(source.lastSuccessAt), limited: hotspots.length >= 2000 };
 }
 export function parseCases(body: unknown): CasesData {
   const data = record(body);
@@ -108,6 +131,9 @@ export function parseCases(body: unknown): CasesData {
   if (![total, page, pageSize].every(Number.isInteger) || total < 0 || page < 1 || pageSize < 1 || pageSize > 100) throw new Error("Invalid pagination");
   return { total, page, pageSize, items: array(data.data).map((raw) => {
     const item = record(raw);
-    return { id: text(item.id), number: text(item.number), title: text(item.title), ...point(item), verification: verification(item.verificationStatus), handling: handling(item.handlingStatus), priority: choice(item.priority, ["HIGH", "MEDIUM", "LOW", "UNASSESSED"]), priorityReason: item.priorityReason === null ? null : text(item.priorityReason), updatedAt: date(item.updatedAt), openedAt: date(item.openedAt) };
+    const perimeter = item.perimeter == null ? null : parsePolygon(item.perimeter);
+    const perimeterRevision = item.perimeterRevision === undefined ? 0 : number(item.perimeterRevision);
+    if (!Number.isInteger(perimeterRevision) || perimeterRevision < 0 || (perimeter && perimeterRevision < 1)) throw new Error("Invalid perimeter revision");
+    return { id: text(item.id), number: text(item.number), title: text(item.title), ...point(item), regionId: item.regionId == null ? null : text(item.regionId), verification: verification(item.verificationStatus), handling: handling(item.handlingStatus), priority: choice(item.priority, ["HIGH", "MEDIUM", "LOW", "UNASSESSED"]), priorityReason: item.priorityReason === null ? null : text(item.priorityReason), updatedAt: date(item.updatedAt), openedAt: date(item.openedAt), perimeter, perimeterRevision };
   }) };
 }

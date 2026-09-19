@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient, useQuery, type QueryKey } from "@tanstack/react-query";
-import { DashboardError, casesQueryOptions, mapQueryOptions, caseEvidenceQueryOptions, confirmCaseLocation } from "@/api/dashboard";
+import { DashboardError, casesQueryOptions, mapQueryOptions, caseEvidenceQueryOptions, confirmCaseLocation, monitoringSummaryQueryOptions, sourceHealthQueryOptions, monitoringUsersQueryOptions, monitoringUserQueryOptions, monitoringOperationsQueryOptions, type MonitoringUserFilters } from "@/api/dashboard";
 import { dashboardRefreshMs } from "@/constants";
 import { AuthError, dashboardLogin } from "@/lib";
 import type { CaseFilters, DashboardUser } from "@/types";
@@ -9,6 +9,7 @@ export function useDashboardResource<T>(user: DashboardUser, queryKey: QueryKey,
   const query = useQuery({
     queryKey,
     enabled,
+    gcTime: queryKey[3] === "map" ? 5 * 60_000 : 0,
     queryFn: async ({ signal }) => {
       await checkDashboardAccount(user, signal);
       try {
@@ -21,7 +22,7 @@ export function useDashboardResource<T>(user: DashboardUser, queryKey: QueryKey,
           clearDashboardQueries();
           window.location.replace(dashboardLogin(user.role));
         }
-        if (error instanceof DashboardError && error.status === 403) return null;
+        if (error instanceof DashboardError && error.status === 403) { clearDashboardQueries(); return null; }
         throw error;
       }
     },
@@ -58,4 +59,40 @@ export function useCaseLocation(user: DashboardUser, id: string) {
 export function useQueryGetCases(user: DashboardUser, filters: CaseFilters) {
   const options = casesQueryOptions(user, filters);
   return useDashboardResource(user, options.queryKey, options.queryFn, false, user.role === "ADMIN");
+}
+export function useMonitoringSummary(user: DashboardUser) {
+  const options = monitoringSummaryQueryOptions(user);
+  return useDashboardResource(user, options.queryKey, options.queryFn, true, user.role === "ADMIN");
+}
+export function useSourceHealth(user: DashboardUser) {
+  const options = sourceHealthQueryOptions(user);
+  return useDashboardResource(user, options.queryKey, options.queryFn, true, user.role === "ADMIN");
+}
+export function useMonitoringUsers(user: DashboardUser, filters: MonitoringUserFilters = { page: 1, search: "", role: "", active: "", emailVerified: "" }) {
+  const options = monitoringUsersQueryOptions(user, filters);
+  return useDashboardResource(user, options.queryKey, options.queryFn, false, user.role === "ADMIN");
+}
+export function useMonitoringUser(user: DashboardUser, id: string) {
+  const options = monitoringUserQueryOptions(user, id);
+  return useDashboardResource(user, options.queryKey, options.queryFn, false, user.role === "ADMIN" && !!id);
+}
+export function useMonitoringTeams(user: DashboardUser) {
+  const options = monitoringOperationsQueryOptions(user, "teams");
+  return useDashboardResource(user, options.queryKey, options.queryFn, true, user.role === "ADMIN");
+}
+export function useMonitoringEquipment(user: DashboardUser) {
+  const options = monitoringOperationsQueryOptions(user, "equipment");
+  return useDashboardResource(user, options.queryKey, options.queryFn, true, user.role === "ADMIN");
+}
+export function useMonitoringAssignments(user: DashboardUser) {
+  const options = monitoringOperationsQueryOptions(user, "assignments");
+  return useDashboardResource(user, options.queryKey, options.queryFn, true, user.role === "ADMIN");
+}
+export function useMonitoringAccessWater(user: DashboardUser) {
+  const options = monitoringOperationsQueryOptions(user, "access-water");
+  return useDashboardResource(user, options.queryKey, options.queryFn, true, user.role === "ADMIN");
+}
+export function useMonitoringOperations(user: DashboardUser) {
+  const options = monitoringOperationsQueryOptions(user);
+  return useDashboardResource(user, options.queryKey, options.queryFn, true, user.role === "ADMIN");
 }

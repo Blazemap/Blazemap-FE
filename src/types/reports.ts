@@ -30,9 +30,11 @@ export type OwnReport = {
   id: string; number: string; observationTypes: ObservationType[]; observedAt: string; createdAt: string;
   locationMode: ReportDraft["locationMode"]; latitude: number | null; longitude: number | null;
   accuracyMeters: number | null; locationDescription: string; description: string;
-  reviewStatus: "NEW" | "NEEDS_DETAILS" | "REVIEWED";
+  reviewStatus: "NEW" | "UNDER_REVIEW" | "NEEDS_DETAILS" | "REVIEWED" | "DECLINED";
+  progress?: { id: string; stage: string; description: string; createdAt: string; actorDisplay: string; attachments?: { id: string; filename: string; contentType: string; size: number }[] }[];
   region: { id: string; name: string; timezone: string } | null;
   case: { number: string; verificationStatus: string; handlingStatus: string } | null;
+  windContext?: import("@/lib/wind").WindContext | null;
   attachments: { id: string; filename: string; size: number; contentType: string }[];
   updates?: { id: string; message: string; kind: string; authorRole: string; createdAt: string }[];
 };

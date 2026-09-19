@@ -3,11 +3,12 @@ import { addReportUpdate, createReport, reportQueryOptions, reportsQueryOptions,
 import { queryKeys } from "@/api/queryKeys";
 import type { DashboardUser, ReportPayload } from "@/types";
 
-export function useQueryGetReports(user: DashboardUser, page: number) { return useQuery({ ...reportsQueryOptions(user, page), retry: false }); }
+export function useQueryGetReports(user: DashboardUser, page: number, pageSize = 20, enabled = true) { return useQuery({ ...reportsQueryOptions(user, page, pageSize), enabled, retry: false }); }
 export function useQueryGetReport(user: DashboardUser, id: string) { return useQuery({ ...reportQueryOptions(user, id), retry: false }); }
 export function useQueryGetRegions(search: string) { return useQuery({ ...regionsQueryOptions(search), retry: false }); }
 export function useMutationCreateReport(user: DashboardUser) {
-  return useMutation({ mutationFn: (payload: ReportPayload) => createReport(user, payload), retry: false, gcTime: 0 });
+  const client = useQueryClient();
+  return useMutation({ mutationFn: (payload: ReportPayload) => createReport(user, payload), retry: false, gcTime: 0, onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.dashboard.reportsAll(user) }) });
 }
 export function useMutationAddReportUpdate(user: DashboardUser, id: string) {
   const client = useQueryClient();

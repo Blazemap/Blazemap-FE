@@ -50,6 +50,12 @@ try {
   limited = false;
   await client.fetchQuery(accountQueryOptions);
   assert.equal(calls, 3);
+  for (const role of ['ADMIN', 'USER']) {
+    Object.assign(user, { role, canConfirmIncidents: true, canPublishInformation: true });
+    const parsed = await accountQueryOptions.queryFn({ signal: new globalThis.AbortController().signal });
+    assert.equal(parsed.canConfirmIncidents, role === 'ADMIN');
+    assert.equal(parsed.canPublishInformation, role === 'ADMIN');
+  }
   assert.equal(accountQueryOptions.retry, false);
   assert.equal(accountQueryOptions.retryOnMount, false);
   assert.equal(accountQueryOptions.refetchInterval, 60000);

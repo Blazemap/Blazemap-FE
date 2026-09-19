@@ -1,0 +1,36 @@
+import assert from 'node:assert/strict';
+import { URL } from 'node:url';
+import console from 'node:console';
+import { readFile } from 'node:fs/promises';
+import { parsePlaces } from './places.ts';
+const p = { name: 'Banten', label: 'Banten, Indonesia', latitude: -6.445, longitude: 106.137, bbox: [104.65, -7.45, 106.78, -5.49] };
+assert.deepEqual(parsePlaces([p]), [p]);
+for (const change of [{ latitude: NaN }, { longitude: 180 }, { bbox: [107, -7, 106, -5] }, { bbox: null, name: '' }, { bbox: [104, -7, 105, -5] }]) assert.throws(() => parsePlaces([{ ...p, ...change }]));
+assert.throws(() => parsePlaces(Array(6).fill(p)));
+const source = path => readFile(new URL(path, import.meta.url), 'utf8');
+const search = await source('../pages/dashboard/components/PlaceSearch.tsx');
+assert.match(search, /controller\.abort\(\)/);
+assert.match(search, /generation.current === version/);
+assert.match(search, /const items = loading \? \[\] : result.items/);
+assert.match(search, /\}, 500\)/);
+for (const key of ['ArrowDown', 'ArrowUp', 'Escape', 'Enter', 'aria-activedescendant', 'role="combobox"', 'role="listbox"', 'role="option"']) assert.ok(search.includes(key));
+assert.doesNotMatch(search, /MapItem|filterMap|government-reports|Nominatim/);
+for (const path of ['../pages/dashboard/DashboardPage.tsx', '../pages/dashboard/components/CitizenDashboard.tsx']) {
+  const page = await source(path);
+  assert.match(page, /filterMap\(data\?\.items \?\? \[\], "",/);
+  assert.doesNotMatch(page, /filterMap\([^\n]*\bsearch\b/);
+  assert.match(page, /<PlaceSearch/);
+  assert.match(page, /<SituationMap place=\{place\}/);
+}
+const dashboard = await source('../pages/dashboard/DashboardPage.tsx');
+assert.doesNotMatch(dashboard, /feedCategory|feedPage/);
+assert.match(dashboard, /useGovernmentReports\(user, "", reportStatus, feed \? 10 : 20\)/);
+assert.match(dashboard, /GovernmentWorklist reports=\{internalFeed\}/);
+assert.match(dashboard, /setFocusPoint\(hasPoint\(value\) \? \{ latitude: value.latitude, longitude: value.longitude \} : null\)/);
+const worklist = await source('../pages/dashboard/components/GovernmentWorklist.tsx');
+assert.doesNotMatch(worklist.slice(0, worklist.indexOf('export function CasePanel')), /Report queue|>Cases<|<CasePanel/);
+const reports = await source('../pages/dashboard/components/GovernmentReports.tsx');
+assert.doesNotMatch(reports, /useGovernmentReports\(user/);
+assert.match(reports, /reportFilters.map/);
+assert.match(reports, /aria-pressed=\{status === filter.value\}/);
+console.log('Place results, stale query safeguards, accessible controls and shared government feed checks passed');

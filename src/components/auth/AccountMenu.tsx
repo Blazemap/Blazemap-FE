@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { AlertDialog, DropdownMenu } from "radix-ui";
-import { ChevronDown, LayoutDashboard, LogOut, UserRound } from "lucide-react";
+import { Activity, ChevronDown, LayoutDashboard, LogOut, UserRound } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui";
 import { useLogout } from "@/hooks";
@@ -10,7 +10,7 @@ import { workspacePath } from "@/lib/dashboard";
 
 const menuItem = "flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-3 text-sm outline-none data-[highlighted]:bg-secondary data-[disabled]:cursor-default data-[disabled]:text-muted-foreground";
 
-export function AccountMenu({ user }: { user: DashboardUser }) {
+export function AccountMenu({ user, showWorkspaceLinks = true }: { user: DashboardUser; showWorkspaceLinks?: boolean }) {
   const [isOpen, setOpen] = useState(false);
   const [isConfirmOpen, setConfirmOpen] = useState(false);
   const avatar = useAvatar(user);
@@ -23,7 +23,7 @@ export function AccountMenu({ user }: { user: DashboardUser }) {
   async function handleLogout() {
     if (!await logout()) return;
     setConfirmOpen(false);
-    if (["/dashboard", "/monitoring", "/feed", "/account", "/profile", "/my-reports", "/report"].some(path => pathname.startsWith(path))) navigate("/", { replace: true });
+    if (["/dashboard", "/monitoring", "/feed", "/news", "/account", "/profile", "/my-reports", "/report"].some(path => pathname.startsWith(path))) navigate("/", { replace: true });
     requestAnimationFrame(() => document.querySelector<HTMLAnchorElement>('header a[href="/login"]')?.focus());
   }
   return <>
@@ -32,8 +32,7 @@ export function AccountMenu({ user }: { user: DashboardUser }) {
       <DropdownMenu.Portal><DropdownMenu.Content align="end" sideOffset={8} collisionPadding={12} data-lenis-prevent className="z-[70] w-72 max-w-[calc(100vw-24px)] rounded-xl border bg-white p-2 text-forest shadow-xl" onCloseAutoFocus={(event) => { if (isConfirmOpen) event.preventDefault(); }}>
         <DropdownMenu.Label className="block px-3 py-3"><span className="block break-words text-sm font-extrabold">{user.name || "Account"}</span><span className="mt-1 block break-all text-xs font-normal text-muted-foreground">{user.email}</span></DropdownMenu.Label>
         <DropdownMenu.Separator className="my-1 h-px bg-border" />
-        <DropdownMenu.Item asChild className={menuItem}><Link to={workspacePath(user.role)}><LayoutDashboard size={17} aria-hidden="true" />Dashboard</Link></DropdownMenu.Item>
-        {user.role === "ADMIN" && <DropdownMenu.Item asChild className={menuItem}><Link to="/monitoring"><LayoutDashboard size={17} aria-hidden="true" />Monitoring</Link></DropdownMenu.Item>}
+        {showWorkspaceLinks && <><DropdownMenu.Item asChild className={menuItem}><Link to={workspacePath(user.role)}><LayoutDashboard size={17} aria-hidden="true" />Dashboard</Link></DropdownMenu.Item>{user.role === "ADMIN" && <DropdownMenu.Item asChild className={menuItem}><Link to="/monitoring"><Activity size={17} aria-hidden="true" />Monitoring</Link></DropdownMenu.Item>}</>}
         <DropdownMenu.Item asChild className={menuItem}><Link to="/profile"><UserRound size={17} aria-hidden="true" />Profile</Link></DropdownMenu.Item>
         <DropdownMenu.Separator className="my-1 h-px bg-border" />
         <DropdownMenu.Item className={menuItem} onSelect={() => { resetError(); setConfirmOpen(true); }}><LogOut size={17} aria-hidden="true" />Logout</DropdownMenu.Item>

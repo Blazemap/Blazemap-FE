@@ -63,7 +63,7 @@ const containerTag = mapSource.match(/<div ref=\{container\}[^>]+>/)[0];
 assert.match(containerTag, /className="h-full w-full /);
 assert.doesNotMatch(containerTag, /\babsolute\b/);
 assert.match(mapSource, /import "maplibre-gl\/dist\/maplibre-gl.css"/);
-assert.match(mapSource, /map\.on\("load", \(\) => \{\s*if \(disposed\) return;\s*clearTimeout\(timeout\);/);
+assert.match(mapSource, /map\.on\("style.load", \(\) => \{\s*if \(disposed\) return;\s*clearTimeout\(timeout\);/);
 assert.doesNotMatch(mapSource, /map\.loaded\(\)/);
 
 const account = { id: "a", role: "ADMIN", name: "Test" };

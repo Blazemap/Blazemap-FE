@@ -105,12 +105,12 @@ try {
   replies.push({ data: report });
   await api.linkGovernmentReport("r", "c", "Review report");
   assert.equal(requests.at(-1).method, "patch");
-  assert.deepEqual(requests.at(-1).data, { caseId: "c", reviewStatus: "REVIEWED", reason: "Review report" });
+  assert.deepEqual(requests.at(-1).data, { caseId: "c", reason: "Review report" });
   const field = { findings: "VISIBLE_FIRE", description: "Visible burning", source: "Field team", observedAt: publication.publishedAt, latitude: -2, longitude: 110 };
   replies.push({ data: { id: "f" } });
   assert.equal(await api.recordField("c", field), "f");
   assert.ok(requests.at(-1).url.endsWith("/field-updates"));
-  const decision = { outcome: "CONFIRMED_FIRE", fieldUpdateId: "f", version: 8, reason: "Actual visible fire", authorityReference: "AUTH-1" };
+  const decision = { outcome: "CONFIRMED_FIRE", fieldUpdateId: "f", version: 8, reason: "Actual visible fire", reporterMessage: "Field inspection confirmed visible fire.", authorityReference: "AUTH-1", perimeter: geometry, perimeterObservedAt: publication.publishedAt, perimeterSource: "Survey" };
   replies.push({ data: { id: "c" } });
   await api.verifyGovernmentCase("c", decision);
   assert.deepEqual(requests.at(-1).data, decision);
@@ -124,8 +124,8 @@ try {
   await api.savePublication(publicationInput);
   assert.ok(!requests.at(-1).url.endsWith("/publish"), "saving never publishes");
   replies.push({ data: { ...publicationInput, id: "p", status: "PUBLISHED", updatedAt: publication.publishedAt } });
-  await api.publishPerimeter("p", publication.publishedAt, "AUTH-2");
-  assert.deepEqual(requests.at(-1).data, { expectedUpdatedAt: publication.publishedAt, authorityReference: "AUTH-2" });
+  await api.publishPerimeter("p", publication.publishedAt, "AUTH-2", 9);
+  assert.deepEqual(requests.at(-1).data, { expectedUpdatedAt: publication.publishedAt, authorityReference: "AUTH-2", expectedCaseVersion: 9 });
 } finally { delete globalThis.__governmentCheck; }
 
 const map = await readFile(new URL("../pages/dashboard/components/SituationMap.tsx", import.meta.url), "utf8");

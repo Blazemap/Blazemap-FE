@@ -1,26 +1,29 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, type KeyboardEvent, type MouseEvent } from "react";
-import ReportPage from "@/pages/report";
-import ReportsPage from "@/pages/reports";
-import { boundPanel, workspacePath } from "@/lib/dashboard";
-import { Link, useLoaderData, useLocation, useSearchParams } from "react-router-dom";
-import { Dialog, Popover, Select } from "radix-ui";
-import { ArrowLeft, ArrowUpRight, Check, ClipboardList, Crosshair, Flame, List, MapPin, RefreshCw, ShieldCheck, Satellite, SlidersHorizontal, X } from "lucide-react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useLoaderData, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { Activity, FileText, List, RefreshCw, ShieldCheck } from "lucide-react";
+import { usePublicationMap } from "@/hooks/dashboard/usePublicationMap";
+import MapLayers from "./components/MapLayers";
+import { foreground } from "@/assets";
+import { FeedEmpty, FeedRow, FeedRowsSkeleton, FeedSentinel } from "./components/FeedRow";
+import { useGovernmentCase, useGovernmentReport, useGovernmentReports } from "@/hooks/dashboard/useGovernment";
 import { dashboardLogin } from "@/lib";
+import { DraftGuard, WorkspaceNav } from "@/components/common";
+import { Button } from "@/components/ui";
+import type { DashboardUser } from "@/types";
+import { CasePanel } from "./components/GovernmentWorklist";
+import type { GovernmentReport } from "@/types/government";
 import type { PerimeterDraft } from "@/lib/perimeter";
 import type { WindArrow } from "@/lib/wind";
+import { CitizenDashboard, GovernmentWorklist, MapSkeleton, ObservationListSkeleton, PlaceSearch } from "@/pages/dashboard/components";
 import { ItemDetail } from "./components/CitizenDashboard";
-import { foreground } from "@/assets";
-import { DraftGuard, WorkspaceNav } from "@/components/common";
-
-import type { DashboardUser, MapItem, ReportDraft } from "@/types";
-import { handlingLabels, verificationLabels } from "@/constants";
-import { Button } from "@/components/ui";
-import { CitizenDashboard, FeedSkeleton, GovernmentWorklist, LayerPreview, MapSkeleton, ObservationListSkeleton, ObservationSearch } from "@/pages/dashboard/components";
+import { ReportReview } from "./components/GovernmentReports";
+import { GovernmentReportDetailSkeleton } from "./components/DashboardSkeletons";
+import MapPanel from "./components/MapPanel";
 import { useDashboardSession, useQueryGetMap } from "@/hooks/dashboard";
-import { ageMap, filterMap, hasPoint, formatTime, mapAvailability } from "@/pages/dashboard/utils";
+import { governmentPublicItems, privateReportMarkers } from "@/lib/dashboard";
+import { ageMap, filterMap, formatTime, mapAvailability, hasPoint } from "@/pages/dashboard/utils";
 
 const SituationMap = lazy(() => import("@/pages/dashboard/components/SituationMap"));
-const control = "min-h-11 w-full rounded-xl border border-input bg-white px-3 text-sm";
 
 export function Component() {
   const user = useLoaderData() as DashboardUser;
@@ -31,122 +34,136 @@ export function Component() {
 
 function Workspace({ user }: { user: DashboardUser }) {
   const { pathname } = useLocation();
-  const home = workspacePath(user.role);
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const feed = pathname === "/feed" || params.get("view") === "feed";
-  const [reportPending, setReportPending] = useState(false);
-  const [perimeterDraft, setPerimeterDraft] = useState<PerimeterDraft | null>(null);
-  const [wind, setWind] = useState<WindArrow | null>(null);
-  useEffect(() => {
-    if (!perimeterDraft) return;
-    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [perimeterDraft]);
-  const [pick, setPick] = useState<{ latitude: string; longitude: string; locationMode: ReportDraft["locationMode"]; receive: (latitude: string, longitude: string) => void } | null>(null);
-  const [reportLocation, setReportLocation] = useState<{ latitude: string; longitude: string; locationMode: ReportDraft["locationMode"] } | null>(null);
-  const reportOpen = user.role === "USER" && params.get("panel") === "report";
-  const myReports = user.role === "USER" && params.get("panel") === "my-reports";
-  const [detailDraft, setDetailDraft] = useState({ dirty: false, pending: false });
-  const handleDetailDraft = useCallback((dirty: boolean, pending: boolean) => setDetailDraft({ dirty, pending }), []);
-  const handleReportLocation = useCallback((location: { latitude: string; longitude: string; locationMode: ReportDraft["locationMode"] } | null) => setReportLocation(location), []);
-  const reportOpener = useRef<HTMLElement | null>(null);
-  const worklistOpener = useRef<HTMLElement | null>(null);
-  function restoreFocus(opener: HTMLElement | null, selector: string) {
-    const visible = (element: HTMLElement) => element.isConnected && element.getClientRects().length > 0 && !element.closest('[inert], [aria-hidden="true"]');
-    const target = opener && visible(opener) ? opener : Array.from(document.querySelectorAll<HTMLElement>(selector)).find(visible);
-    target?.focus();
-  }
-  function openWorklist(opener?: HTMLElement) { if (!mobileOpen) worklistOpener.current = opener ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null); setMobileOpen(true); }
-  function openReport(event?: MouseEvent<HTMLButtonElement>) { if (reportPending || perimeterDraft) return; if (event) reportOpener.current = event.currentTarget; setParams(current => { current.set("panel", "report"); current.delete("view"); return current; }, { replace: true }); }
-  function closeReport() { if (reportPending) return; setParams(current => { current.delete("panel"); return current; }, { replace: true }); }
-  const [box, setBox] = useState(() => boundPanel({ x: 24, y: 96, width: 380, height: window.innerHeight - 120 }, { width: window.innerWidth, height: window.innerHeight }));
-  const [sheetHeight, setSheetHeight] = useState(68);
-  const [reportsHeight, setReportsHeight] = useState(72);
-  const [reportBox, setReportBox] = useState(() => boundPanel({ x: window.innerWidth - 424, y: 96, width: 400, height: window.innerHeight - 120 }, { width: window.innerWidth, height: window.innerHeight }));
-  const gesture = useRef<{ x: number; y: number; box: typeof box; height: number; mode: "move" | "resize" | "sheet" | "reports"; report: boolean } | null>(null);
-  function adjust(next: typeof box, report = false) { (report ? setReportBox : setBox)(boundPanel(next, { width: window.innerWidth, height: window.innerHeight })); }
-  useEffect(() => { const resize = () => { const viewport = { width: window.innerWidth, height: window.innerHeight }; setBox(current => boundPanel(current, viewport)); setReportBox(current => boundPanel(current, viewport)); }; window.addEventListener("resize", resize); return () => window.removeEventListener("resize", resize); }, []);
-  function start(event: PointerEvent<HTMLButtonElement>, mode: "move" | "resize" | "sheet" | "reports", report = false) { if (event.button !== 0 || !event.isPrimary) return; event.currentTarget.setPointerCapture(event.pointerId); gesture.current = { x: event.clientX, y: event.clientY, box: report ? reportBox : box, height: mode === "reports" ? reportsHeight : sheetHeight, mode, report }; }
-  function move(event: PointerEvent<HTMLButtonElement>) { const initial = gesture.current; if (!initial || !event.currentTarget.hasPointerCapture(event.pointerId)) return; const x = event.clientX - initial.x, y = event.clientY - initial.y; if (initial.mode === "reports") setReportsHeight(Math.max(44, Math.min(82, initial.height - y / window.innerHeight * 100))); else if (initial.mode === "sheet") setSheetHeight(Math.max(34, Math.min(86, initial.height - y / window.innerHeight * 100))); else adjust(initial.mode === "move" ? { ...initial.box, x: initial.box.x + x, y: initial.box.y + y } : { ...initial.box, width: initial.box.width + x, height: initial.box.height + y }, initial.report); }
-  function keyboard(event: KeyboardEvent<HTMLButtonElement>, resize = false, report = false) { const current = report ? reportBox : box; const x = event.key === "ArrowRight" ? 20 : event.key === "ArrowLeft" ? -20 : 0; const y = event.key === "ArrowDown" ? 20 : event.key === "ArrowUp" ? -20 : 0; if (!x && !y) return; event.preventDefault(); adjust(resize ? { ...current, width: current.width + x, height: current.height + y } : { ...current, x: current.x + x, y: current.y + y }, report); }
-  const pointerEnd = () => { gesture.current = null; };
+  const [desktop, setDesktop] = useState(() => window.matchMedia("(min-width: 768px)").matches);
   const [hours, setHours] = useState(48);
-  const [search, setSearch] = useState("");
+  const [place, setPlace] = useState<import("@/lib/places").Place | null>(null);
   const [publications, setPublications] = useState(true);
   const [hotspots, setHotspots] = useState(true);
-  const [panel, setPanel] = useState<"reports" | "results" | "cases">(user.role === "ADMIN" ? "cases" : "reports");
-  const [mobileOpen, setMobileOpen] = useState(params.has("case") || params.has("observation"));
-  const [desktop, setDesktop] = useState(() => window.matchMedia("(min-width: 768px)").matches);
+  const caseId = params.get("case");
+  const selectedCase = useGovernmentCase(user, caseId ?? "");
+  const [caseDraft, setCaseDraft] = useState({ dirty: false, pending: false });
+  const onCaseDraft = useCallback((dirty: boolean, pending: boolean) => setCaseDraft({ dirty, pending }), []);
+  const [listOpen, setListOpen] = useState(false);
+  const [focusPoint, setFocusPoint] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [worklistOpen, setWorklistOpen] = useState(false);
+  const [limit, setLimit] = useState(40);
+  const [perimeterDraft, setPerimeterDraft] = useState<PerimeterDraft | null>(null);
+  const [wind, setWind] = useState<WindArrow | null>(null);
+  const [reportStatus, setReportStatus] = useState("");
+  const [reportId, setReportId] = useState<string | null>(() => params.get("report"));
+  const [reviewDraft, setReviewDraft] = useState({ dirty: false, pending: false });
+  const onDraft = useCallback((dirty: boolean, pending: boolean) => setReviewDraft({ dirty, pending }), []);
+  const internalFeed = useGovernmentReports(user, "", feed ? "" : reportStatus, feed ? 10 : 20);
+  const reportDetail = useGovernmentReport(user, reportId);
+  const reportsUnavailable = internalFeed.failed || reportDetail.failed;
+  const reportTotal = internalFeed.data?.meta.total ?? 0;
+  const authorizedReports = internalFeed.forbidden ? [] : internalFeed.data?.data ?? [];
+  const report = reportDetail.forbidden || internalFeed.forbidden ? null : reportDetail.data ?? authorizedReports.find(item => item.id === reportId) ?? null;
+  const loaded = useQueryGetMap(user, hours);
+  const data = useMemo(() => loaded.data ? ageMap(loaded.data, loaded.now) : null, [loaded.data, loaded.now]);
+  const privateCases = useMemo(() => {
+    const loadedCases = data?.privateCases ?? [];
+    const detail = selectedCase.data;
+    if (!detail) return loadedCases;
+    return [...loadedCases.filter(item => item.id !== detail.id), detail];
+  }, [data?.privateCases, selectedCase.data]);
+  const mapItems = useMemo(() => filterMap(governmentPublicItems(data?.items ?? [], privateCases), "", feed || publications, !feed && hotspots), [data?.items, feed, publications, hotspots, privateCases]);
+  const mapReports = useMemo(() => {
+    const markers = privateReportMarkers(data?.privateReports ?? [], privateCases);
+    if (!perimeterDraft || !report || perimeterDraft.caseId !== `report:${report.id}` || markers.some(item => item.id === report.id)) return markers;
+    return [...markers, report];
+  }, [data?.privateReports, privateCases, perimeterDraft, report]);
+  const publication = usePublicationMap(user, params.get("publication"));
+  const items = publication.item && (feed || publications) ? [...mapItems.filter(item => item.id !== publication.item!.id), publication.item] : mapItems;
+  const selected = publication.item ?? items.find(item => item.id === params.get("observation")) ?? null;
+  const availability = mapAvailability(data, loaded.failed);
   useEffect(() => {
     const media = window.matchMedia("(min-width: 768px)");
     const update = () => setDesktop(media.matches);
     media.addEventListener("change", update);
     return () => media.removeEventListener("change", update);
   }, []);
-  const [limit, setLimit] = useState(40);
-  const loaded = useQueryGetMap(user, hours);
-  const data = useMemo(() => loaded.data ? ageMap(loaded.data, loaded.now) : null, [loaded.data, loaded.now]);
-  const items = useMemo(() => filterMap(data?.items ?? [], search, feed || publications, !feed && hotspots), [data, search, feed, publications, hotspots]);
-  const selected = items.find(item => item.id === params.get("observation")) ?? null;
-  const availability = mapAvailability(data, loaded.failed);
-  function select(id: string, opener?: HTMLElement) { if (reportPending || pick || perimeterDraft) return; setParams(current => { current.set("observation", id); return current; }, { replace: true }); openWorklist(opener); }
-  function clearSelection() { if (reportPending || perimeterDraft) return; setParams(current => { current.delete("observation"); return current; }, { replace: true }); }
-  const searchControl = (id: string, side: "top" | "bottom") => <ObservationSearch id={id} query={search} items={items} initialLoading={loaded.initialLoading} feed={feed} side={side} onQueryChange={value => { setSearch(value); setLimit(40); }} onSelect={select} />;
-  const filters = <Popover.Root><Popover.Trigger asChild><Button variant="ghost" className="rounded-full" aria-label="Observation filters"><SlidersHorizontal size={17} aria-hidden="true" /><span className="hidden md:inline">Filters</span></Button></Popover.Trigger><Popover.Portal><Popover.Content side="top" sideOffset={12} collisionPadding={16} className="z-50 w-72 rounded-2xl border bg-white p-5 text-forest shadow-xl"><div className="mb-4 flex items-center justify-between"><h2 className="font-extrabold">Filters</h2><Popover.Close asChild><Button size="icon" variant="ghost" aria-label="Close filters"><X size={17} /></Button></Popover.Close></div><label htmlFor="map-window" className="text-sm font-bold">Time range<Select.Root value={String(hours)} onValueChange={value => { setHours(Number(value)); setLimit(40); }}><Select.Trigger id="map-window" className={`${control} mt-2 flex items-center justify-between border-emerald-800/30 text-forest focus-visible:outline-2 focus-visible:outline-emerald-700`}><Select.Value /><Select.Icon aria-hidden="true">⌄</Select.Icon></Select.Trigger><Select.Portal><Select.Content position="popper" sideOffset={6} collisionPadding={12} className="z-80 max-h-[var(--radix-select-content-available-height)] w-[var(--radix-select-trigger-width)] overflow-y-auto rounded-xl border border-emerald-800/20 bg-white p-1 text-forest shadow-xl"><Select.Viewport>{[[24, "Last 24 hours"], [48, "Last 48 hours"], [168, "Last 7 days"]].map(([value, label]) => <Select.Item key={value} value={String(value)} className="flex min-h-11 cursor-pointer items-center justify-between rounded-lg px-3 text-sm outline-none data-[highlighted]:bg-emerald-50 data-[state=checked]:bg-emerald-800 data-[state=checked]:text-white"><Select.ItemText>{label}</Select.ItemText><Select.ItemIndicator aria-hidden="true">✓</Select.ItemIndicator></Select.Item>)}</Select.Viewport></Select.Content></Select.Portal></Select.Root></label>
-    {!feed && <fieldset className="mt-5"><legend className="mb-3 text-sm font-bold">Map layers</legend><div className="grid grid-cols-2 gap-3">{([{ label: "Published summaries", checked: publications, change: setPublications, hotspot: false }, { label: "Satellite hotspots", checked: hotspots, change: setHotspots, hotspot: true }]).map(layer => <label key={layer.label} className={`cursor-pointer rounded-sm border p-1.5 focus-within:outline-2 focus-within:outline-primary ${layer.checked ? "border-primary bg-linear-to-b from-white to-emerald-50" : "border-primary/15 bg-white"}`}><LayerPreview hotspot={layer.hotspot} /><span className="flex min-h-11 items-center gap-2 px-1 py-2 text-xs font-bold"><input type="checkbox" className="size-4 shrink-0 accent-primary" checked={layer.checked} onChange={event => layer.change(event.target.checked)} />{layer.label}</span></label>)}</div></fieldset>}</Popover.Content></Popover.Portal></Popover.Root>;
-  const actions = <>{filters}<Button variant="ghost" className="rounded-full" data-worklist-trigger aria-label="Open observation list" onClick={event => { setPanel("results"); clearSelection(); openWorklist(event.currentTarget); }}><List size={18} aria-hidden="true" /><span>List</span></Button>{user.role === "ADMIN" ? <Button variant="ghost" className="rounded-full" data-worklist-trigger onClick={event => { setPanel("cases"); clearSelection(); openWorklist(event.currentTarget); }}><ShieldCheck size={17} aria-hidden="true" /><span>Cases</span></Button> : null}{user.role === "USER" && <><Button asChild variant="ghost" className="rounded-full"><Link to={`${home}?panel=my-reports`}><ClipboardList size={17} aria-hidden="true" /><span className="hidden md:inline">My reports</span><span className="sr-only md:hidden">My reports</span></Link></Button>{pathname === "/feed" ? <Button asChild className="rounded-full"><Link to={`${home}?panel=report`}>Report</Link></Button> : <Button data-report-trigger className="rounded-full" disabled={reportPending} onClick={openReport}>Report</Button>}</>}</>;
-  const observations = <>
-    <div className="p-4">{availability && <p role={loaded.failed ? "alert" : "status"} className="mb-4 hidden rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-950 md:block">{availability}</p>}
-      {loaded.initialLoading && <ObservationListSkeleton />}
-      <ul className="space-y-2">{items.slice(0, limit).map(item => <li key={item.id}><button type="button" className="group flex w-full gap-3 rounded-xl border border-primary/10 bg-white p-4 text-left transition-colors hover:border-primary/40 hover:bg-secondary/30" onClick={event => select(item.id, event.currentTarget)}><ItemIcon item={item} /><span className="min-w-0 flex-1"><span className="block text-sm font-extrabold leading-5">{item.title}</span><span className="mt-1 block text-xs text-muted-foreground">{item.verification ? verificationLabels[item.verification] : "Satellite hotspot"}</span><span className="mt-2 block text-xs text-muted-foreground">{formatTime(item.time)}</span>{!hasPoint(item) && <span className="mt-1 block text-xs">{item.publicPerimeter ? "Approved perimeter" : "No public map location"}</span>}</span><ArrowUpRight size={15} aria-hidden="true" className="shrink-0 text-primary" /></button></li>)}</ul>
-      {data && !items.length && <div className="py-10 text-center"><h3 className="font-extrabold">No matching observations</h3><p className="mt-2 text-sm leading-6 text-muted-foreground">No published updates match your filters.</p></div>}
-      {items.length > limit && <Button variant="outline" className="mt-4 w-full rounded-full" onClick={() => setLimit(value => value + 40)}>Show more</Button>}
-      {data?.limited && <p className="mt-4 text-xs">Results are limited. Narrow the time range.</p>}
-    </div>
-    <div className="mt-auto border-t border-primary/10 p-4 text-xs leading-5 text-muted-foreground">{data?.lastSuccessAt && <p>Satellite source refreshed {formatTime(data.lastSuccessAt)}.</p>}</div>
-  </>;
-  const panelContent = panel === "cases" && !selected ? <GovernmentWorklist onWind={setWind} user={user} draft={perimeterDraft} setDraft={setPerimeterDraft} canDraw={!feed} /> : selected ? <><header className="border-b border-primary/10 bg-white px-7 py-6"><Button variant="ghost" className="mb-3" onClick={clearSelection}><ArrowLeft size={16} aria-hidden="true" />Back to list</Button><h2 className="text-2xl font-extrabold tracking-tight">{selected.title}</h2></header><ItemDetail item={selected} />{feed && (hasPoint(selected) || selected.publicPerimeter) && <Button asChild className="mx-5 mb-5 rounded-full"><Link to={`${home}?observation=${encodeURIComponent(selected.id)}`}>View approved location on map</Link></Button>}</> : observations;
+  function discardReview() {
+    if (reviewDraft.pending || caseDraft.pending || perimeterDraft) return false;
+    return !(reviewDraft.dirty || caseDraft.dirty) || window.confirm("Discard unsaved detail changes?");
+  }
+  function clearSelection() { setParams(current => { const next = new URLSearchParams(current); next.delete("observation"); next.delete("case"); next.delete("publication"); next.delete("report"); return next; }, { replace: true }); }
+  function select(id: string) {
+    if (!discardReview()) return;
+    setReportId(null);
+    setParams(current => { const next = new URLSearchParams(current); next.set("observation", id); next.delete("case"); next.delete("publication"); return next; }, { replace: true });
+    if (!desktop) setWorklistOpen(false);
+  }
+  function selectReport(value: GovernmentReport) {
+    if (!discardReview()) return false;
+    if (!feed) clearSelection();
+    setReportId(value.id);
+    setFocusPoint(hasPoint(value) ? { latitude: value.latitude, longitude: value.longitude } : null);
+    if (!desktop) setWorklistOpen(false);
+    return true;
+  }
+  function selectCase(id: string) {
+    if (!discardReview()) return;
+    setReportId(null);
+    setParams(current => { const next = new URLSearchParams(current); next.set("case", id); next.delete("observation"); next.delete("publication"); return next; }, { replace: true });
+    if (!desktop) setWorklistOpen(false);
+  }
+  function viewReport(value: GovernmentReport) {
+    if (!selectReport(value)) return;
+    const next = new URLSearchParams(params);
+    next.delete("observation"); next.delete("case"); next.delete("publication"); next.delete("view");
+    navigate(`/dashboard?${next.toString()}`, { replace: true });
+  }
+  function closeDetail() { if (!discardReview()) return; setReportId(null); clearSelection(); }
+  function changeRange(value: string) { if (!discardReview()) return; setHours(Number(value)); setLimit(40); clearSelection(); }
+  function openList(value: "cases" | "results") {
+    if (!desktop && (selected || report || caseId) && !discardReview()) return;
+    if (!desktop) { clearSelection(); setReportId(null); }
+    if (value === "cases") { setWorklistOpen(true); if (!desktop) setListOpen(false); }
+    else { setListOpen(true); if (!desktop) setWorklistOpen(false); }
+  }
+  const searchControl = (id: string, side: "top" | "bottom") => <PlaceSearch id={id} side={side} onSelect={value => { if (!discardReview()) return; setPlace(value); const next = new URLSearchParams(params); next.delete("view"); navigate(`/dashboard?${next.toString()}`, { replace: true }); }} />;
+  const filters = <MapLayers hours={hours} onRange={changeRange} feed={feed} publications={publications} hotspots={hotspots} onPublications={setPublications} onHotspots={setHotspots} />;
+  const actions = <>{filters}{!feed && <><Button variant="ghost" aria-pressed={listOpen && (desktop || (!selected && !report && !caseId))} className={listOpen && (desktop || (!selected && !report && !caseId)) ? "bg-primary text-white shadow-sm hover:bg-forest hover:text-white" : undefined} data-worklist-trigger onClick={() => openList("results")}><List size={18} aria-hidden="true" />List</Button><Button variant="ghost" aria-pressed={worklistOpen && (desktop || (!selected && !report && !caseId))} className={worklistOpen && (desktop || (!selected && !report && !caseId)) ? "bg-primary text-white shadow-sm hover:bg-forest hover:text-white" : undefined} data-worklist-trigger onClick={() => openList("cases")}><ShieldCheck size={18} aria-hidden="true" />Worklist</Button></>}</>;
+  const observations = <div className="p-4">
+    {availability && <p role={loaded.failed ? "alert" : "status"} className="mb-4 text-xs text-amber-950">{availability}</p>}
+    {loaded.initialLoading && <ObservationListSkeleton />}
+    <ul className="space-y-2">{items.slice(0, limit).map(item => <li key={item.id}><button type="button" onClick={() => select(item.id)} className="flex w-full items-start gap-3 rounded-xl border border-primary/10 bg-white p-4 text-left hover:bg-secondary">{item.kind === "hotspot" ? <img src="/icons8-satellite.png" alt="" width={40} height={40} className="size-10 shrink-0" /> : <span className="grid size-10 shrink-0 place-items-center rounded-sm bg-secondary text-primary"><FileText size={24} aria-hidden="true" /></span>}<span className="min-w-0 flex-1"><span className="block font-extrabold">{item.title}</span><span className="mt-2 block text-xs text-muted-foreground">{item.kind === "hotspot" ? "Satellite detection" : "Published report"} · {formatTime(item.time)}</span></span></button></li>)}</ul>
+    {data && !items.length && <p className="py-8 text-sm">No matching observations.</p>}
+    {items.length > limit && <Button variant="outline" className="mt-4 w-full" onClick={() => setLimit(value => value + 40)}>Show more</Button>}
+    {data?.limited && <p className="mt-3 text-xs">Results are limited. Narrow the time range.</p>}
+  </div>;
+  const detailOpen = !!selected || !!report || !!caseId;
+  const reportDrawing = perimeterDraft?.caseId === `report:${report?.id}`;
+  const detail = caseId ? <CasePanel key={caseId} user={user} id={caseId} draft={perimeterDraft} setDraft={setPerimeterDraft} canDraw={!feed} onWind={setWind} onDraft={onCaseDraft} /> : report ? (reportDetail.initialLoading ? <GovernmentReportDetailSkeleton /> : <>{reportDetail.failed && <div role="alert" className="space-y-3 p-4 text-sm"><p>Report details could not refresh.</p><Button variant="outline" onClick={reportDetail.retry}>Retry</Button></div>}<fieldset disabled={reportsUnavailable} aria-busy={reportDetail.refreshing}><ReportReview key={report.id} user={user} report={report} onDraft={onDraft} perimeterDraft={reportDrawing ? perimeterDraft : null} setPerimeterDraft={setPerimeterDraft} canDraw={!feed && (!perimeterDraft || !!reportDrawing)} /></fieldset></>) : selected ? <ItemDetail item={selected} /> : null;
   return <main className="relative isolate h-dvh overflow-hidden bg-secondary/40 text-forest">
-    <DraftGuard dirty={!!perimeterDraft} pending={!!perimeterDraft?.pending} />
-    <h1 className="sr-only">{feed ? "Published updates" : user.role === "ADMIN" ? "Coordination map" : "My reports"}</h1>
-    <div inert={reportPending || !!perimeterDraft}><WorkspaceNav user={user}><div className="space-y-2">{searchControl("mobile-observation-search", "bottom")}<div className="flex items-center justify-between gap-1">{actions}</div></div></WorkspaceNav></div>
-    {!feed && <section aria-label="Situation map" className="absolute inset-0"><Suspense fallback={<MapSkeleton />}><SituationMap wind={user.role === "ADMIN" && panel === "cases" && !selected && !pick && !reportOpen && !myReports ? wind : null} perimeterDraft={user.role === "ADMIN" ? perimeterDraft : null} onPerimeterDraft={setPerimeterDraft} items={items} selected={selected} draftLocation={pick ?? reportLocation} onSelect={select} onPick={pick ? (latitude, longitude) => setPick(current => current ? { ...current, latitude, longitude } : null) : undefined} /></Suspense></section>}
-    {!feed && desktop && !myReports && <aside aria-label="Map worklist" style={{ left: box.x, top: box.y, width: box.width, height: box.height }} className="absolute z-20 hidden flex-col overflow-hidden rounded-sm border border-primary/10 bg-white shadow-xl md:flex"><button type="button" aria-label="Move panel using arrow keys or drag" className="min-h-11 shrink-0 touch-none cursor-move border-b bg-white px-4 text-left text-xs font-bold focus-visible:outline-2 focus-visible:outline-primary" onPointerDown={event => start(event, "move")} onPointerMove={move} onPointerUp={pointerEnd} onPointerCancel={pointerEnd} onLostPointerCapture={pointerEnd} onKeyDown={event => keyboard(event)}><span aria-hidden="true" className="mx-auto block h-1.5 w-12 rounded-full bg-primary/25" /><span className="sr-only">Move panel</span></button>{user.role === "ADMIN" && <div className="flex shrink-0 gap-1 border-b bg-white p-2">{([['results', 'Public observations'], ['cases', 'Internal cases']] as const).map(([value, label]) => <button key={value} type="button" disabled={!!perimeterDraft} aria-pressed={panel === value && !selected} onClick={() => { setPanel(value); clearSelection(); }} className={`min-h-11 flex-1 rounded-xl text-xs font-extrabold ${panel === value && !selected ? "bg-primary text-white" : "hover:bg-white"}`}>{label}</button>)}</div>}<div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">{panelContent}</div><button type="button" aria-label="Resize panel using arrow keys or drag" className="min-h-11 shrink-0 touch-none cursor-nwse-resize border-t px-4 text-right text-xs font-bold focus-visible:outline-2 focus-visible:outline-primary" onPointerDown={event => start(event, "resize")} onPointerMove={move} onPointerUp={pointerEnd} onPointerCancel={pointerEnd} onLostPointerCapture={pointerEnd} onKeyDown={event => keyboard(event, true)}><span aria-hidden="true" className="mx-auto block h-1.5 w-12 rounded-full bg-primary/25" /><span className="sr-only">Resize panel</span></button></aside>}
-    {feed && <section aria-label="Published update feed" className="absolute inset-0 isolate overflow-y-auto overscroll-contain bg-white px-4 pb-32 pt-56 sm:px-6 sm:pt-28"><div className="mx-auto max-w-2xl">
-      <header className="mb-5 flex items-end justify-between gap-4 border-b border-primary/10 pb-3"><h2 className="text-2xl font-extrabold tracking-tight">Report feed</h2><Button variant="outline" size="icon" className="rounded-full bg-white" aria-label="Refresh published updates" aria-busy={loaded.refreshing} disabled={loaded.loading} onClick={loaded.retry}><RefreshCw size={17} aria-hidden="true" /></Button></header>
-      <div aria-hidden="true" className="pointer-events-none fixed inset-x-0 bottom-0 -z-10 h-[38vh] overflow-hidden [mask-image:linear-gradient(to_bottom,transparent,#000)]"><img src={foreground} alt="" className="absolute bottom-0 left-0 w-[42vw] max-w-lg opacity-20" /><img src={foreground} alt="" className="absolute bottom-0 right-0 w-[38vw] max-w-md -scale-x-100 opacity-15" /></div>
-      <div role="group" aria-label="Feed visibility" className="mb-5 flex gap-2 border-b border-primary/10 pb-3">{([['results', 'Public'], ['cases', 'Internal']] as const).map(([value, label]) => <Button key={value} aria-pressed={panel === value} variant={panel === value ? "default" : "outline"} onClick={() => { setPanel(value); clearSelection(); setMobileOpen(false); }}>{label}</Button>)}</div>
-      {panel === "cases" ? <GovernmentWorklist onWind={setWind} user={user} draft={perimeterDraft} setDraft={setPerimeterDraft} canDraw={false} /> : <>
-      {loaded.failed && <p role="alert" className="mb-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-950">{availability}</p>}
-      {loaded.loading && !data && <FeedSkeleton />}
-      {data && !items.length && <p className="px-2 py-14 text-center text-sm font-bold text-muted-foreground">No published updates match your filters.</p>}
-      <div className="space-y-5">{items.slice(0, limit).map(item => <article key={item.id} className="overflow-hidden rounded-sm border border-primary/10 bg-white shadow-[0_18px_44px_-18px_#123c301a]">
-        <header className="flex flex-wrap items-center gap-3 border-b border-primary/10 px-5 py-4"><ItemIcon item={item} /><div className="min-w-0 flex-1"><p className="text-sm font-extrabold">Published case update</p><time dateTime={item.time} className="mt-1 block text-xs text-muted-foreground">{formatTime(item.time)}</time></div><span className={`rounded-full px-3 py-1.5 text-xs font-bold ${item.verification === "CONFIRMED_FIRE" ? "bg-orange-50 text-orange-900" : "bg-secondary text-primary"}`}>{item.verification && verificationLabels[item.verification]}</span></header>
-        <div className="px-5 py-6 sm:px-7"><h3 className="text-2xl font-extrabold leading-snug tracking-tight">{item.title}</h3><dl className="mt-5 divide-y divide-primary/10 rounded-xl border border-primary/10 bg-secondary/25 px-4"><div className="py-4"><dt className="flex items-center gap-2 text-xs font-bold text-muted-foreground"><MapPin size={15} aria-hidden="true" />Published location</dt><dd className="mt-1.5 text-sm font-bold">{item.location}</dd></div><div className="py-4"><dt className="text-xs font-bold text-muted-foreground">Handling status</dt><dd className="mt-1.5 text-sm font-bold">{item.handling && handlingLabels[item.handling]}</dd></div></dl></div>
-        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-primary/10 px-5 py-3"><p className="max-w-xs text-xs leading-5 text-muted-foreground">Approved snapshot. Private reports and original evidence are not shared.</p><Button variant="ghost" className="rounded-full text-primary" onClick={event => select(item.id, event.currentTarget)}>View update<ArrowUpRight size={16} aria-hidden="true" /></Button></footer>
-      </article>)}</div>
-      {items.length > limit && <Button variant="outline" className="mt-5 w-full rounded-full" onClick={() => setLimit(value => value + 40)}>Show more</Button>}{data?.limited && <p className="mt-4 text-xs">Results are limited. Use a shorter time range.</p>}
-    </>}</div></section>}
-    {!feed && <div className="absolute left-4 top-56 z-10 max-w-[calc(100%-96px)] rounded-2xl border border-white/80 bg-white/95 px-4 py-3 shadow-sm sm:left-6 sm:top-28 md:hidden"><p className="text-sm font-extrabold">Kalimantan</p><p role="status" className="mt-1 text-xs text-muted-foreground">{loaded.loading ? "Updating observations…" : data ? `${items.length} observations` : "Observations unavailable"}</p>{availability && <p className="mt-2 max-w-xs text-xs leading-5 text-amber-900">{availability}</p>}<button type="button" className="mt-1 min-h-11 text-xs font-extrabold text-primary underline underline-offset-4" data-worklist-trigger onClick={event => { setPanel("results"); openWorklist(event.currentTarget); }}>Open observation list</button></div>}
-    <div inert={reportPending || !!perimeterDraft} className="absolute bottom-6 left-1/2 z-30 hidden w-[calc(100%-160px)] max-w-3xl -translate-x-1/2 items-center gap-1 rounded-full border border-primary/10 bg-white p-2 shadow-[0_8px_32px_-8px_#123c3040] sm:flex">{searchControl("observation-search", "top")}{actions}</div>
-    <Dialog.Root modal={!perimeterDraft} open={mobileOpen && (feed ? !!selected : !desktop)} onOpenChange={open => { if (!perimeterDraft) setMobileOpen(open); }}><Dialog.Portal>{!perimeterDraft && <Dialog.Overlay className="fixed inset-0 z-50 bg-forest/30" />}<Dialog.Content onInteractOutside={event => { if (perimeterDraft) event.preventDefault(); }} onCloseAutoFocus={event => { event.preventDefault(); restoreFocus(worklistOpener.current, '[data-worklist-trigger], [data-report-trigger]'); }} style={{ height: `${sheetHeight}dvh` }} className="fixed inset-x-0 bottom-0 z-60 flex max-h-[85dvh] flex-col overflow-hidden rounded-t-3xl border bg-white text-forest shadow-2xl md:inset-x-auto md:bottom-6 md:left-6 md:top-24 md:w-[380px] md:max-h-[calc(100vh-120px)] md:rounded-sm"><button type="button" className="min-h-11 shrink-0 touch-none border-b text-xs font-bold" aria-label="Resize sheet: drag or use up and down arrow keys" onPointerDown={event => start(event, "sheet")} onPointerMove={move} onPointerUp={pointerEnd} onPointerCancel={pointerEnd} onLostPointerCapture={pointerEnd} onKeyDown={event => { if (event.key === "ArrowUp" || event.key === "ArrowDown") { event.preventDefault(); setSheetHeight(value => Math.max(34, Math.min(86, value + (event.key === "ArrowUp" ? 5 : -5)))); } }}><span aria-hidden="true" className="mx-auto block h-1.5 w-12 rounded-full bg-primary/25" /><span className="sr-only">Resize panel</span></button><div className="flex shrink-0 items-center justify-between gap-3 border-b bg-white px-5 py-3"><Dialog.Title className="text-lg font-extrabold">{selected ? "Observation details" : panel === "cases" ? "Coordination" : panel === "reports" ? "My reports" : "Observations"}</Dialog.Title><Dialog.Close asChild><Button size="icon" variant="ghost" aria-label="Close panel"><X size={18} aria-hidden="true" /></Button></Dialog.Close></div><Dialog.Description className="sr-only">{panel === "cases" ? "Authorized internal cases, separate from the public map." : "Published summaries and satellite observations. Not fire perimeters."}</Dialog.Description>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{panelContent}</div></Dialog.Content></Dialog.Portal></Dialog.Root>
-    {myReports && <section aria-label="My reports" style={desktop ? undefined : { height: `${reportsHeight}vh` }} className="absolute inset-x-0 bottom-0 z-40 flex h-[72vh] max-h-[82vh] flex-col overflow-hidden rounded-t-2xl border border-primary/10 bg-white shadow-xl md:inset-x-auto md:bottom-auto md:left-6 md:top-24 md:h-[calc(100vh-120px)] md:min-h-[min(400px,calc(100vh-120px))] md:max-h-[calc(100vh-120px)] md:w-[380px] md:min-w-[320px] md:max-w-[600px] md:resize md:rounded-sm"><button type="button" aria-label="Resize My reports with up or down arrow keys or drag" className="min-h-11 shrink-0 touch-none md:hidden" onPointerDown={event => start(event, "reports")} onPointerMove={move} onPointerUp={pointerEnd} onPointerCancel={pointerEnd} onLostPointerCapture={pointerEnd} onKeyDown={event => { if (event.key === "ArrowUp" || event.key === "ArrowDown") { event.preventDefault(); setReportsHeight(value => Math.max(44, Math.min(82, value + (event.key === "ArrowUp" ? 5 : -5)))); } }}><span aria-hidden="true" className="mx-auto block h-1.5 w-12 rounded-full bg-primary/25" /></button><header className="flex items-center justify-between border-b px-7 py-6"><h2 className="text-2xl font-extrabold">My reports</h2><Button asChild variant="ghost"><Link to={home} aria-label="Close My reports">Close</Link></Button></header><div className="min-h-0 flex-1 overflow-y-auto"><ReportsPage user={user} id={params.get("report")} onDraft={handleDetailDraft} /></div></section>}
-    {user.role === "USER" && pathname === home && <ReportPage detailDirty={detailDraft.dirty || !!perimeterDraft} detailPending={detailDraft.pending || !!perimeterDraft?.pending} onRestoreFocus={() => restoreFocus(reportOpener.current, '[data-report-trigger]')} desktop={desktop} style={desktop ? { left: reportBox.x, top: reportBox.y, width: reportBox.width, height: reportBox.height, bottom: "auto" } : { height: `${sheetHeight}vh` }} handle={<button type="button" aria-label={desktop ? "Move panel using arrow keys or drag" : "Resize panel using up and down arrow keys or drag"} className="min-h-11 shrink-0 touch-none border-b bg-white text-xs font-bold" onPointerDown={event => start(event, desktop ? "move" : "sheet", true)} onPointerMove={move} onPointerUp={pointerEnd} onPointerCancel={pointerEnd} onLostPointerCapture={pointerEnd} onKeyDown={event => { if (desktop) keyboard(event, false, true); else if (event.key === "ArrowUp" || event.key === "ArrowDown") { event.preventDefault(); setSheetHeight(value => Math.max(34, Math.min(86, value + (event.key === "ArrowUp" ? 5 : -5)))); } }}><span aria-hidden="true" className="mx-auto block h-1.5 w-12 rounded-full bg-primary/25" /><span className="sr-only">{desktop ? "Move panel" : "Resize panel"}</span></button>} resizeHandle={desktop && <button type="button" aria-label="Resize panel using arrow keys or drag" className="min-h-11 shrink-0 touch-none border-t px-4 text-right text-xs font-bold" onPointerDown={event => start(event, "resize", true)} onPointerMove={move} onPointerUp={pointerEnd} onPointerCancel={pointerEnd} onLostPointerCapture={pointerEnd} onKeyDown={event => keyboard(event, true, true)}><span aria-hidden="true" className="mx-auto block h-1.5 w-12 rounded-full bg-primary/25" /><span className="sr-only">Resize panel</span></button>}
-      open={reportOpen && !pick && !feed} onClose={closeReport} onPending={setReportPending} onLocationChange={handleReportLocation} onPick={({ latitude, longitude, locationMode, receive }) => { if (reportPending) return; setPick({ latitude, longitude, locationMode, receive }); closeReport(); }} />}
-    {pick && <section aria-labelledby="pick-title" className="absolute left-1/2 top-56 z-50 w-[calc(100%-32px)] max-w-md -translate-x-1/2 rounded-xl border border-primary/15 bg-white p-4 shadow-lg sm:top-28"><div className="flex items-start gap-3"><Crosshair className="mt-0.5 shrink-0 text-primary" size={20} aria-hidden="true" /><div><h2 id="pick-title" className="font-extrabold">Choose the {pick.locationMode === "OBSERVER_POSITION" ? "observer position" : "estimated incident location"}</h2><p role="status" className="mt-1 text-sm text-muted-foreground">Tap the map to place the pin, then drag it to adjust.</p></div></div>{pick.latitude && pick.longitude ? <p className="mt-3 rounded-lg bg-secondary/60 px-3 py-2 text-xs font-bold tabular-nums">Selected: {Number(pick.latitude).toFixed(6)}, {Number(pick.longitude).toFixed(6)}</p> : <p className="mt-3 text-xs font-bold text-amber-900">No location selected yet.</p>}<div className="mt-3 flex flex-wrap gap-2"><Button disabled={!pick.latitude || !pick.longitude} onClick={() => { const location = { latitude: pick.latitude, longitude: pick.longitude, locationMode: pick.locationMode }; pick.receive(pick.latitude, pick.longitude); setReportLocation(location); setPick(null); openReport(); }}><Check size={16} aria-hidden="true" />Confirm location</Button><Button variant="outline" onClick={() => { setPick(null); openReport(); }}>Cancel</Button></div></section>}
+    <DraftGuard dashboard dirty={!!perimeterDraft || caseDraft.dirty} pending={!!perimeterDraft?.pending || caseDraft.pending} />
+    <h1 className="sr-only">Coordination map</h1>
+    <div inert={!!perimeterDraft || (!desktop && detailOpen)}><WorkspaceNav user={user}><div>{searchControl("mobile-observation-search", "bottom")}<div className="flex">{actions}</div></div></WorkspaceNav></div>
+    {!feed && <section aria-label="Situation map" className="absolute inset-0"><Suspense fallback={<MapSkeleton />}><SituationMap place={place} focusPoint={focusPoint} items={items} selected={selected} onSelect={select} privateReports={loaded.failed ? [] : mapReports} selectedReport={report} onSelectReport={selectReport} privateCases={privateCases} selectedCaseId={caseId} onSelectCase={selectCase} perimeterDraft={perimeterDraft} onPerimeterDraft={setPerimeterDraft} wind={wind} /></Suspense></section>}
+    {!feed && params.get("publication") && (publication.isPending || publication.isError || !publication.item) && <div role={publication.isError ? "alert" : "status"} className="absolute left-4 top-56 z-20 rounded-sm border bg-white p-4 text-sm sm:top-28">{publication.isPending ? "Loading published location…" : "Approved map location unavailable."}{publication.isError && <Button variant="outline" onClick={() => void publication.refetch()}>Retry</Button>}</div>}
+    {feed && <section aria-label="Citizen reports feed" className="absolute inset-0 overflow-y-auto overscroll-contain bg-white px-4 pb-32 pt-56 sm:pt-28">
+      <div aria-hidden="true" className="pointer-events-none fixed inset-x-0 bottom-0 h-[38vh] overflow-hidden [mask-image:linear-gradient(to_bottom,transparent,#000)]"><img src={foreground} alt="" className="absolute bottom-0 left-0 w-[42vw] max-w-lg opacity-20" /><img src={foreground} alt="" className="absolute bottom-0 right-0 w-[38vw] max-w-md -scale-x-100 opacity-15" /></div>
+      <div className="relative mx-auto max-w-2xl">
+        <div>
+          <header className="mb-5 flex items-end justify-between border-b border-primary/10 pb-3"><h2 className="text-2xl font-extrabold">Citizen reports</h2><Button variant="outline" size="icon" className="rounded-full border-white/40 bg-white text-forest" aria-label="Refresh citizen reports" aria-busy={internalFeed.loading} disabled={internalFeed.loading} onClick={internalFeed.retry}><RefreshCw size={17} aria-hidden="true" /></Button></header>
+          <div className="space-y-5"><p className="text-xs text-muted-foreground">All authorized citizen reports, newest first.</p>{internalFeed.initialLoading && <FeedRowsSkeleton />}{internalFeed.failed && <p role="alert">Internal reports unavailable. Refresh before reviewing.</p>}{internalFeed.data?.data.length === 0 && <FeedEmpty>No citizen reports for the selected review status.</FeedEmpty>}{authorizedReports.map(item => <FeedRow key={item.id} title={item.description} status={item.triage.level === "UNKNOWN" ? "Needs assessment" : `Review priority: ${item.triage.level}`} time={formatTime(item.observedAt)} location={!hasPoint(item) ? "Location unavailable" : item.locationMode === "OBSERVER_POSITION" ? "Observer position, not incident location" : item.locationDescription || "Estimated incident location"} onOpen={() => viewReport(item)} />)}{internalFeed.loadingMore && <FeedRowsSkeleton />}<FeedSentinel enabled={internalFeed.hasMore && !internalFeed.loading && !internalFeed.failed} onLoad={internalFeed.showMore} />{internalFeed.failed && <Button variant="outline" disabled={internalFeed.loading} onClick={internalFeed.retry}>Refresh</Button>}</div>
+        </div>
+      </div>
+    </section>}
+    <MapPanel title="List" count={`${items.length} observations`} side="left" desktop={desktop} open={!feed && !perimeterDraft && listOpen && (desktop || !detailOpen)} keepMounted disabled={!!perimeterDraft} onClose={() => setListOpen(false)}>{observations}</MapPanel>
+    <MapPanel title="Worklist" count={internalFeed.data ? `${reportTotal} reports` : undefined} side="center" desktop={desktop} open={!feed && !perimeterDraft && worklistOpen && (desktop || !detailOpen)} keepMounted disabled={!!perimeterDraft} onClose={() => setWorklistOpen(false)}>
+      <GovernmentWorklist reports={internalFeed} status={reportStatus} setStatus={setReportStatus} onSelectReport={selectReport} onViewReport={viewReport} />
+    </MapPanel>
+    <MapPanel title={caseId ? "Internal case details" : report ? `Review ${report.number}` : selected?.title ?? "Observation details"} count={!report && detailOpen ? "1 selected" : undefined} desktop={desktop} open={!feed && detailOpen} drawing={!!perimeterDraft} disabled={reviewDraft.pending || caseDraft.pending || !!perimeterDraft} onClose={closeDetail}>{detail}</MapPanel>
+    <div inert={!!perimeterDraft || (!desktop && detailOpen)} className="absolute bottom-6 left-1/2 z-30 hidden w-[calc(100%-160px)] max-w-3xl -translate-x-1/2 items-center gap-1 rounded-full border bg-white p-2 shadow-xl sm:flex">{searchControl("observation-search", "top")}{actions}</div>
+    {!desktop && !worklistOpen && !detailOpen && <Button className="absolute bottom-5 left-4 z-30" onClick={() => openList("cases")}><Activity size={17} aria-hidden="true" />Worklist</Button>}
   </main>;
 }
 
-
-function ItemIcon({ item }: { item: MapItem }) {
-  const confirmed = item.kind === "publication" && item.verification === "CONFIRMED_FIRE";
-  const Icon = item.kind === "hotspot" ? Satellite : confirmed ? Flame : ShieldCheck;
-  return <span className={`grid size-10 shrink-0 place-items-center rounded-xl ${item.kind === "hotspot" ? "bg-amber-50 text-amber-800" : confirmed ? "bg-orange-50 text-orange-800" : "bg-secondary text-primary"}`}><Icon size={20} aria-hidden="true" /></span>;
-}
-
-
 export function ErrorBoundary() {
-  return <main className="grid min-h-dvh place-items-center bg-white p-6"><div className="max-w-md"><h1 className="text-2xl font-extrabold">Unable to open the dashboard</h1><p className="mt-3 text-muted-foreground">Your session could not be checked. No private dashboard data has been loaded.</p><div className="mt-5 flex flex-wrap gap-3"><Button onClick={() => window.location.reload()}>Retry</Button><Button asChild variant="outline"><Link to={dashboardLogin("USER")}>Member Login</Link></Button><Button asChild variant="outline"><Link to={dashboardLogin("ADMIN")}>Government Login</Link></Button></div></div></main>;
+  return <main className="grid min-h-dvh place-items-center bg-white p-6"><div className="max-w-md"><h1 className="text-2xl font-extrabold">Unable to open the dashboard</h1><p className="mt-3 text-muted-foreground">Your session could not be checked. No private dashboard data has been loaded.</p><div className="mt-5 flex gap-3"><Button onClick={() => window.location.reload()}>Retry</Button><Button asChild variant="outline"><Link to={dashboardLogin("ADMIN")}>Government Login</Link></Button></div></div></main>;
 }

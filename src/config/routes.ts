@@ -16,8 +16,24 @@ export const routes: RouteObject[] = [
         lazy: async () => ({ Component: (await import("@/pages/home")).default }),
       },
       {
+        path: "vision-mission",
+        lazy: async () => ({ Component: (await import("@/pages/vision-mission")).default }),
+      },
+      {
+        path: "faq",
+        lazy: async () => ({ Component: (await import("@/pages/faq")).default }),
+      },
+      {
         path: "contact",
         lazy: async () => ({ Component: (await import("@/pages/contact")).default }),
+      },
+      {
+        path: "privacy",
+        lazy: async () => ({ Component: (await import("@/pages/privacy")).default }),
+      },
+      {
+        path: "terms",
+        lazy: async () => ({ Component: (await import("@/pages/terms")).default }),
       },
     ],
   },
@@ -36,23 +52,54 @@ export const routes: RouteObject[] = [
       },
     ],
   },
-  ...["/dashboard", "/monitoring"].map((path): RouteObject => ({
-    path,
+  {
+    path: "/dashboard",
     shouldRevalidate: ({ currentUrl, nextUrl, formMethod, defaultShouldRevalidate }) => !formMethod && currentUrl.pathname === nextUrl.pathname && currentUrl.search !== nextUrl.search ? false : defaultShouldRevalidate,
     HydrateFallback: Preloader,
     lazy: async () => {
       const page = await import("@/pages/dashboard");
       return { Component: page.default, ErrorBoundary: page.ErrorBoundary, loader: page.loader };
     },
-  })),
+  },
+  {
+    path: "/monitoring",
+    HydrateFallback: Preloader,
+    lazy: async () => {
+      const dashboard = await import("@/pages/dashboard");
+      const monitoring = await import("@/pages/monitoring");
+      return { Component: monitoring.default, ErrorBoundary: monitoring.MonitoringErrorBoundary, loader: dashboard.loader };
+    },
+    children: [
+      { index: true, lazy: async () => ({ Component: (await import("@/pages/monitoring")).OverviewPage }) },
+      { path: "reports", lazy: async () => ({ Component: (await import("@/pages/monitoring")).ReportsPage }), children: [{ path: ":id", lazy: async () => ({ Component: (await import("@/pages/monitoring")).ReportDetailPage }) }] },
+      { path: "cases", lazy: async () => ({ Component: (await import("@/pages/monitoring")).CasesPage }), children: [{ path: ":id", lazy: async () => ({ Component: (await import("@/pages/monitoring")).CaseDetailPage }) }] },
+      { path: "operations", children: [
+        { index: true, lazy: async () => { const [dashboard, monitoring] = await Promise.all([import("@/pages/dashboard"), import("@/pages/monitoring")]); return { Component: monitoring.OperationsPage, loader: dashboard.loader }; } },
+        { path: "teams", lazy: async () => { const [dashboard, monitoring] = await Promise.all([import("@/pages/dashboard"), import("@/pages/monitoring")]); return { Component: monitoring.OperationsTeamsPage, loader: dashboard.loader }; } },
+        { path: "equipment", lazy: async () => { const [dashboard, monitoring] = await Promise.all([import("@/pages/dashboard"), import("@/pages/monitoring")]); return { Component: monitoring.OperationsEquipmentPage, loader: dashboard.loader }; } },
+        { path: "assignments", lazy: async () => { const [dashboard, monitoring] = await Promise.all([import("@/pages/dashboard"), import("@/pages/monitoring")]); return { Component: monitoring.OperationsAssignmentsPage, loader: dashboard.loader }; } },
+        { path: "access-water", lazy: async () => { const [dashboard, monitoring] = await Promise.all([import("@/pages/dashboard"), import("@/pages/monitoring")]); return { Component: monitoring.OperationsAccessWaterPage, loader: dashboard.loader }; } },
+      ] },
+      { path: "users", lazy: async () => ({ Component: (await import("@/pages/monitoring")).UsersPage }), children: [{ path: ":id", lazy: async () => ({ Component: (await import("@/pages/monitoring")).UserDetailPage }) }] },
+    ],
+  },
+  {
+    path: "/publications/:slug",
+    HydrateFallback: Preloader,
+    lazy: async () => {
+      const { loader, ErrorBoundary } = await import("@/pages/dashboard");
+      return { Component: (await import("@/pages/dashboard/components/PublicationPage")).default, loader, ErrorBoundary };
+    },
+  },
   { path: "/report", loader: ({ request }) => redirect(reportDestination(new URL(request.url).search)) },
-  ...["/my-reports", "/my-reports/:id", "/feed"].map((path): RouteObject => ({
+  ...["/my-reports", "/my-reports/:id", "/feed", "/news"].map((path): RouteObject => ({
     path,
     loader: async args => {
       const { loader } = await import("@/pages/dashboard");
       const user = await loader(args);
       const home = workspacePath(user.role);
-      return redirect(path === "/feed" ? `${home}?view=feed` : `${home}?panel=my-reports${args.params.id ? `&report=${encodeURIComponent(args.params.id)}` : ""}`);
+      if (path === "/news" && user.role === "ADMIN") return redirect(home);
+      return redirect(path === "/news" ? `${home}?view=news` : path === "/feed" ? `${home}?view=feed` : `${home}?panel=my-reports${args.params.id ? `&report=${encodeURIComponent(args.params.id)}` : ""}`);
     },
   })),
   ...["/account", "/profile"].map((path): RouteObject => ({

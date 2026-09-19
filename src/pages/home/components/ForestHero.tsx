@@ -26,7 +26,7 @@ export function ForestHero() {
           <p className="mx-auto mt-5 max-w-[49ch] text-base leading-7 text-muted-foreground sm:text-lg">Forest and land fire awareness for Kalimantan.<br className="hidden sm:block" /> Community observations. Better context. Human decisions.</p>
           <div className="mt-7 flex flex-wrap justify-center gap-3">
             <Button asChild size="lg" className="font-bold"><a href="#how-it-works">How it works <ArrowUpRight size={17} aria-hidden="true" /></a></Button>
-            <Button asChild size="lg" variant="outline" className="font-bold"><a href="#guide">Explore the guide <ArrowDown size={16} aria-hidden="true" /></a></Button>
+            <Button asChild size="lg" variant="outline" className="font-bold"><a href="/faq">Read the FAQ <ArrowDown size={16} aria-hidden="true" /></a></Button>
           </div>
         </div>
       </motion.div>

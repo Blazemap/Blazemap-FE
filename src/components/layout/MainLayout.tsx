@@ -9,11 +9,19 @@ import { workspacePath } from "@/lib/dashboard";
 import SmoothScroll from "./SmoothScroll";
 import { Button } from "@/components/ui";
 import { useAccount, useMotionPreference } from "@/hooks";
+import { clearDashboardQueries } from "@/hooks/dashboard";
 import { AccountMenu } from "@/components/auth";
+import { NotificationBell } from "@/components/notifications";
 
 const links = [
   { label: "Home", href: "/" },
+  { label: "Vision & Mission", href: "/vision-mission" },
+  { label: "FAQ", href: "/faq" },
   { label: "Contact", href: "/contact" },
+];
+const legalLinks = [
+  { label: "Privacy", href: "/privacy" },
+  { label: "Terms", href: "/terms" },
 ];
 
 export default function MainLayout({ accountUser }: { accountUser?: DashboardUser } = {}) {
@@ -24,7 +32,7 @@ export default function MainLayout({ accountUser }: { accountUser?: DashboardUse
   useEffect(() => {
     if (!accountUser || account.isPending || account.isError) return;
     const current = account.data;
-    if (!current || !sameDashboardAccount(accountUser, current)) window.location.replace(current ? workspacePath(current.role) : dashboardLogin(accountUser.role));
+    if (!current || !sameDashboardAccount(accountUser, current)) { clearDashboardQueries(); window.location.replace(current ? workspacePath(current.role) : dashboardLogin(accountUser.role)); }
   }, [account.data, account.isError, account.isPending, accountUser]);
   const [isMenuOpen, setMenuOpen] = useState(false);
   const isReducedMotion = useMotionPreference();
@@ -33,10 +41,30 @@ export default function MainLayout({ accountUser }: { accountUser?: DashboardUse
   const activePath = pathname.replace(/\/+$/, "") || "/";
 
   useEffect(() => {
-    const title = accountUser ? "Account settings — Blazemap" : activePath === "/contact" ? "Contact — Blazemap" : "Blazemap — Forest & land fire awareness";
-    const description = activePath === "/contact"
-      ? "Contact information for Blazemap, public channel availability, and guidance for forest and land fire observations in Kalimantan."
-      : "Get to know Blazemap: forest and land fire awareness for Kalimantan, community observations, human verification, and guidance for staying safe.";
+    const title = accountUser
+      ? "Account settings — Blazemap"
+      : activePath === "/vision-mission"
+        ? "Vision & Mission — Blazemap"
+        : activePath === "/faq"
+          ? "Frequently Asked Questions — Blazemap"
+          : activePath === "/contact"
+            ? "Contact — Blazemap"
+            : activePath === "/privacy"
+              ? "Privacy Policy — Blazemap"
+              : activePath === "/terms"
+                ? "Terms of Use — Blazemap"
+                : "Blazemap — Forest & land fire awareness";
+    const description = activePath === "/vision-mission"
+      ? "Blazemap's vision and mission for credible, traceable forest and land fire information in Kalimantan, guided by human verification."
+      : activePath === "/faq"
+        ? "Answers about community observations, NASA FIRMS hotspots, BMKG forecasts, human verification, AI, privacy, and safety in Blazemap."
+        : activePath === "/contact"
+          ? "Contact information for Blazemap, public channel availability, and guidance for forest and land fire observations in Kalimantan."
+          : activePath === "/privacy"
+            ? "How Blazemap handles account information, community observations, location data, photographs, and AI-assisted case context."
+            : activePath === "/terms"
+              ? "Responsibilities, service limitations, and authority boundaries that apply when using Blazemap."
+              : "Get to know Blazemap: forest and land fire awareness for Kalimantan, community observations, human verification, and guidance for staying safe.";
     document.title = title;
     document.querySelector('meta[name="description"]')?.setAttribute("content", description);
     document.querySelector('meta[property="og:title"]')?.setAttribute("content", title);
@@ -92,14 +120,14 @@ export default function MainLayout({ accountUser }: { accountUser?: DashboardUse
               </ul>
             </nav>
             <div className="ml-auto flex items-center gap-2 lg:ml-0">
-            {user ? <AccountMenu key={user.id} user={user} /> : isGuest ? <div className="hidden items-center gap-3 lg:flex">
+            {user ? <div className="flex items-center gap-1"><NotificationBell user={user} /><AccountMenu key={user.id} user={user} /></div> : isGuest ? <div className="hidden items-center gap-3 lg:flex">
               <Button asChild variant="ghost" className="min-h-11 px-3 font-bold">
                 <a href="/login?portal=government"><Building2 aria-hidden="true" className="size-4" />Government Login</a>
               </Button>
               <Button asChild className="min-h-11 rounded-full px-5 font-bold">
                 <a href="/login"><LogIn aria-hidden="true" className="size-4" />Login</a>
               </Button>
-            </div> : <span role="status" className="text-xs text-muted-foreground">{account.isError ? <button type="button" className="min-h-11 underline" onClick={() => void account.refetch()}>Retry account check</button> : "Checking account…"}</span>}
+            </div> : account.isError ? <button type="button" className="min-h-11 text-xs text-muted-foreground underline" onClick={() => void account.refetch()}>Retry account check</button> : <div role="status" aria-label="Loading account" className="flex items-center gap-3 motion-safe:animate-pulse"><span className="sr-only">Loading account</span><span aria-hidden="true" className="hidden h-11 w-44 rounded-full bg-secondary lg:block" /><span aria-hidden="true" className="h-11 w-11 rounded-full bg-primary/15 lg:w-28" /></div>}
             <Button
               ref={menuButtonRef}
               type="button"
@@ -158,9 +186,9 @@ export default function MainLayout({ accountUser }: { accountUser?: DashboardUse
                 </ul>
               </nav>
             </div>
-            <div className="mt-10 flex flex-col justify-between gap-3 border-t border-sage/25 pt-6 text-xs leading-6 text-sage sm:flex-row">
+            <div className="mt-10 flex flex-col justify-between gap-4 border-t border-sage/25 pt-6 text-xs leading-6 text-sage sm:flex-row sm:items-center">
               <p>© {new Date().getFullYear()} blazemap</p>
-              <p>Forest illustrations and stock photography.</p>
+              <nav aria-label="Legal navigation"><ul className="flex flex-wrap gap-x-6 gap-y-1">{legalLinks.map(({ label, href }) => <li key={href}><a href={href} aria-current={activePath === href ? "page" : undefined} className="inline-flex min-h-11 items-center font-semibold underline-offset-4 hover:underline aria-[current=page]:font-extrabold aria-[current=page]:underline">{label}</a></li>)}</ul></nav>
             </div>
           </div>
         </footer>}

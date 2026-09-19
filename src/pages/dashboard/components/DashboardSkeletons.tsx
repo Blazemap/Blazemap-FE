@@ -3,7 +3,43 @@ export function MapSkeleton() {
 }
 
 export function ObservationListSkeleton() {
-  return <div role="status" aria-label="Loading observations" className="space-y-2 motion-safe:animate-pulse"><span className="sr-only">Loading observations</span>{Array.from({ length: 5 }, (_, index) => <div key={index} className="flex gap-3 rounded-xl border border-primary/10 bg-white p-4"><span className="size-10 shrink-0 rounded-xl bg-secondary" /><span className="min-w-0 flex-1"><span className="block h-5 w-3/4 rounded-full bg-secondary" /><span className="mt-1 block h-4 w-32 rounded-full bg-secondary/80" /><span className="mt-2 block h-4 w-24 rounded-full bg-secondary/70" /></span><span className="size-[15px] shrink-0 rounded bg-secondary" /></div>)}</div>;
+  return <div role="status" aria-label="Loading observations" className="space-y-2 motion-safe:animate-pulse"><span className="sr-only">Loading observations</span>{Array.from({ length: 5 }, (_, index) => <div key={index} className="flex gap-3 rounded-xl border border-primary/10 bg-white p-4"><span className="size-10 shrink-0 rounded-sm bg-secondary" /><span className="min-w-0 flex-1"><span className="block h-5 w-3/4 rounded-full bg-secondary" /><span className="mt-2 block h-4 w-32 rounded-full bg-secondary/80" /></span></div>)}</div>;
+}
+
+export function GovernmentReportSkeleton() {
+  return <div role="status" aria-label="Loading reports" className="space-y-3 motion-safe:animate-pulse">{Array.from({ length: 3 }, (_, index) => <div key={index} aria-hidden="true" className="rounded-xl border bg-white p-4"><span className="block h-3 w-24 rounded bg-secondary" /><span className="mt-2 block h-5 w-3/4 rounded bg-secondary" /><span className="mt-2 block h-10 w-full rounded bg-secondary" /><span className="mt-2 block h-3 w-2/3 rounded bg-secondary" /><span className="mt-1 block h-3 w-1/2 rounded bg-secondary" /><span className="mt-2 block h-3 w-3/4 rounded bg-secondary" /><span className="mt-3 block h-3 w-24 rounded bg-secondary" /></div>)}</div>;
+}
+
+export function GovernmentReportDetailSkeleton() {
+  return <section role="status" aria-label="Loading report details" className="space-y-4 rounded-sm border border-primary/10 bg-white p-4 motion-safe:animate-pulse">
+    <span className="sr-only">Loading report details</span>
+    <div aria-hidden="true" className="space-y-3">
+      <span className="block h-5 w-32 rounded-full bg-secondary" />
+      <span className="block h-4 w-full rounded-full bg-secondary" />
+      <span className="block h-4 w-4/5 rounded-full bg-secondary" />
+    </div>
+    <div aria-hidden="true" className="space-y-4 text-sm">
+      <div><span className="block h-4 w-24 rounded-full bg-secondary/80" /><div className="mt-2 flex gap-3"><span className="h-7 w-24 rounded-full bg-secondary" /><span className="h-7 w-20 rounded-full bg-secondary" /></div></div>
+      <div><span className="block h-4 w-28 rounded-full bg-secondary/80" /><span className="mt-2 block h-4 w-48 rounded-full bg-secondary" /></div>
+      <div><span className="block h-4 w-20 rounded-full bg-secondary/80" /><span className="mt-2 block h-4 w-3/4 rounded-full bg-secondary" /><span className="mt-2 block h-4 w-5/6 rounded-full bg-secondary" /></div>
+    </div>
+    <div aria-hidden="true" className="space-y-3 border-t pt-3">
+      <span className="block h-5 w-52 rounded-full bg-secondary" />
+      <span className="block h-4 w-full rounded-full bg-secondary" />
+      <span className="block h-4 w-5/6 rounded-full bg-secondary" />
+      {Array.from({ length: 3 }, (_, index) => <div key={index}><span className="block h-3 w-32 rounded-full bg-secondary/80" /><span className="mt-2 block h-3 w-4/5 rounded-full bg-secondary" /></div>)}
+    </div>
+    <div aria-hidden="true" className="border-t pt-4">
+      <span className="block h-5 w-24 rounded-full bg-secondary" />
+      <div className="mt-4 ml-2 space-y-5 border-l border-primary/10 pl-5">{Array.from({ length: 2 }, (_, index) => <div key={index}><span className="block h-4 w-28 rounded-full bg-secondary" /><span className="mt-2 block h-3 w-48 rounded-full bg-secondary/80" /></div>)}</div>
+    </div>
+    <div aria-hidden="true" className="space-y-4 border-t pt-4">
+      <div><span className="block h-4 w-16 rounded-full bg-secondary/80" /><span className="mt-2 block h-11 w-full rounded-lg bg-secondary" /></div>
+      <div><span className="block h-4 w-24 rounded-full bg-secondary/80" /><span className="mt-2 block h-24 w-full rounded-lg bg-secondary" /></div>
+      <div><span className="block h-4 w-44 rounded-full bg-secondary/80" /><span className="mt-2 block h-8 w-3/4 rounded bg-secondary" /></div>
+      <span className="block h-11 w-24 rounded-full bg-secondary" />
+    </div>
+  </section>;
 }
 
 export function FeedSkeleton({ variant = "staff" }: { variant?: "citizen" | "staff" }) {

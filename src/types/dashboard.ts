@@ -13,6 +13,8 @@ export type MapItem = {
   location: string;
   publicLocationMode?: "NONE" | "REGION_ONLY" | "APPROVED_INCIDENT_POINT" | "APPROVED_INCIDENT_PERIMETER";
   publicPerimeter?: import("@/lib/perimeter").PublicPerimeter;
+  caseNumber?: string;
+  windContext?: import("@/lib/wind").WindContext | null;
   verification?: Verification;
   handling?: Handling;
   product?: string;
@@ -25,6 +27,10 @@ export type MapItem = {
 export type DemoArea = { id: string; name: string; geometry: { type: "Polygon"; coordinates: [number, number][][] }; areaHectares: number; generatedAt: string; demo: true };
 export type MapData = {
   items: MapItem[];
+  ownReports: import("./reports").OwnReport[];
+  privateReports: import("./government").GovernmentReport[];
+  privateCases: CaseItem[];
+  privateLimited: boolean;
   demoAreas?: DemoArea[];
   updatedAt: string | null;
   sourceStatus: "AVAILABLE" | "STALE" | "NOT_CONFIGURED" | "NOT_SYNCED" | "UNAVAILABLE";
@@ -37,13 +43,57 @@ export type CaseItem = {
   title: string;
   latitude: number | null;
   longitude: number | null;
+  regionId?: string | null;
   verification: Verification;
   handling: Handling;
   priority: Priority;
   priorityReason: string | null;
   updatedAt: string;
   openedAt: string;
+  perimeter: import("@/lib/perimeter").Polygon | null;
+  perimeterRevision: number;
 };
 export type CaseEvidence = { id: string; version: number; fieldUpdates: { id: string; findings: string; observedAt: string; latitude: number | null; longitude: number | null }[] };
 export type CasesData = { items: CaseItem[]; total: number; page: number; pageSize: number };
-export type CaseFilters = { query: string; verification: string; priority: string; page: number };
+export type CaseFilters = { query: string; verification: string; handling?: string; priority: string; page: number; all?: boolean };
+export type MonitoringSummary = {
+  asOf: string;
+  cases: {
+    total: number;
+    openUnverified: number;
+    openConfirmed: number;
+    activeHandling: number;
+    highPriorityOpen: number;
+    byVerification: Record<Verification, number>;
+    byHandling: Record<Handling, number>;
+    byPriority: Record<Priority, number>;
+  };
+  reports: {
+    total: number;
+    awaitingReview: number;
+    inProgress: number;
+    byReviewStatus: Record<"NEW" | "UNDER_REVIEW" | "NEEDS_DETAILS" | "REVIEWED" | "DECLINED", number>;
+  };
+  operations: { activeTeams: number; activeAssignments: number };
+  publications: { drafts: number };
+};
+export type SourceHealth = {
+  database: "connected" | "unavailable";
+  sources: { id: "FIRMS" | "BMKG" | "AI"; name: string; status: "AVAILABLE" | "STALE" | "NOT_CONFIGURED" | "NOT_SYNCED" | "UNAVAILABLE" | "RUNNING" | "SUCCEEDED" | "FAILED" | "OBSOLETE"; message: string | null; lastSuccessAt: string | null }[];
+  uploadsAvailable: boolean;
+  emailAvailable: boolean;
+  googleAvailable: boolean;
+};
+export type MonitoringUser = { id: string; name: string; email: string; role: "USER" | "ADMIN"; active: boolean; emailVerified: boolean; canConfirmIncidents: boolean; canPublishInformation: boolean; createdAt: string; updatedAt: string };
+export type MonitoringUsers = { data: MonitoringUser[]; meta: { total: number; page: number; pageSize: number } };
+export type MonitoringUserPatch = { expectedUpdatedAt: string; name?: string; role?: "USER" | "ADMIN"; active?: boolean; reason: string; mandate?: string };
+export type OperationalSubject = { id: string; active: boolean; version: number; createdAt: string; updatedAt: string; sample: boolean; latestCondition: string | null; latestObservedAt: string | null };
+export type MonitoringOperations = {
+  asOf: string;
+  teams: (OperationalSubject & { name: string; organization: string | null; activeAssignmentCount: number })[];
+  equipment: (OperationalSubject & { name: string; kind: string; teamId: string | null })[];
+  features: { id: string; name: string | null; kind: "ROAD" | "RIVER" | "WATER_SOURCE"; provider: string; verifiedAt: string | null; authoritative: boolean; sample: boolean; latestCondition: string | null; latestObservedAt: string | null }[];
+  updates: { id: string; subjectType: "TEAM" | "EQUIPMENT" | "FEATURE"; subjectId: string; condition: string; source: string; observedAt: string; notes: string | null; createdAt: string; sample: boolean }[];
+  assignments: { id: string; caseId: string; caseNumber: string; caseTitle: string; caseVerification: string; caseHandling: string; teamId: string; teamName: string; status: "ASSIGNED" | "ACCEPTED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED"; notes: string | null; version: number; sample: boolean; createdAt: string; updatedAt: string }[];
+  counts: { teams: number; availableTeams: number; equipment: number; availableEquipment: number; activeAssignments: number; access: number; passableAccess: number; water: number; availableWater: number };
+};

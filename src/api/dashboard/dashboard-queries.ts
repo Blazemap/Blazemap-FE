@@ -45,12 +45,26 @@ export async function confirmCaseLocation(user: DashboardUser, id: string, body:
 export function casesQueryOptions(user: DashboardUser, filters: CaseFilters) {
   return { queryKey: queryKeys.dashboard.cases(user, filters), enabled: user.role === "ADMIN", queryFn: async ({ signal }: { signal: AbortSignal }) => {
     if (user.role !== "ADMIN") throw new DashboardError(403);
-    const { query, verification, priority, page } = filters;
-    if (!Number.isInteger(page) || page < 1 || query.length > 200 || !["", "UNVERIFIED", "CONFIRMED_FIRE", "NOT_FIRE"].includes(verification) || !["", "HIGH", "MEDIUM", "LOW", "UNASSESSED"].includes(priority)) throw new DashboardError();
-    const params = new URLSearchParams({ page: String(page), pageSize: "20" });
-    if (query) params.set("search", query);
-    if (verification) params.set("verificationStatus", verification);
-    if (priority) params.set("priority", priority);
-    return parseCases(await request(apiEndpoints.cases, signal, params));
+    const { query, verification, handling = "", priority, page, all = false } = filters;
+    if (!Number.isInteger(page) || page < 1 || query.length > 200 || !["", "UNVERIFIED", "CONFIRMED_FIRE", "NOT_FIRE"].includes(verification) || !["", "OPEN", "CHECK_SCHEDULED", "ON_SCENE", "RESPONDING", "MONITORING", "CLOSED"].includes(handling) || !["", "HIGH", "MEDIUM", "LOW", "UNASSESSED"].includes(priority)) throw new DashboardError();
+    const pageSize = all ? 100 : 20;
+    const loadPage = async (requestedPage: number) => {
+      const params = new URLSearchParams({ page: String(requestedPage), pageSize: String(pageSize) });
+      if (query) params.set("search", query);
+      if (verification) params.set("verificationStatus", verification);
+      if (handling) params.set("handlingStatus", handling);
+      if (priority) params.set("priority", priority);
+      return parseCases(await request(apiEndpoints.cases, signal, params));
+    };
+    const first = await loadPage(all ? 1 : page);
+    if (!all || first.items.length >= first.total) return first;
+    const items = [...first.items];
+    for (let next = 2; items.length < first.total; next++) {
+      signal.throwIfAborted();
+      const result = await loadPage(next);
+      items.push(...result.items);
+      if (!result.items.length) throw new DashboardError(502);
+    }
+    return { ...first, items };
   } };
 }

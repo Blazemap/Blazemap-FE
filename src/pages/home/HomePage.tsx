@@ -1,4 +1,4 @@
-import { ArrowUpRight, Check, ChevronDown } from "lucide-react";
+import { ArrowUpRight, Check } from "lucide-react";
 import { followup, observation, rainforestSmall, review } from "@/assets";
 import { ForestAccent, ForestHero, ForestImage, Reveal } from "./components";
 
@@ -6,13 +6,6 @@ const steps = [
   { number: "01", title: "Share what you notice", text: "Smoke, flames, or a burning smell? An observation starts with what you saw, when, and where.", href: "#observe", link: "About observations" },
   { number: "02", title: "Put the signs in context", text: "Community observations, satellite indications, and weather help people understand the situation.", href: "#review", link: "About human review" },
   { number: "03", title: "Follow the next steps", text: "A report moves through review. Public information is checked separately before it is shared.", href: "#follow", link: "About report progress" },
-];
-
-const questions = [
-  { title: "What can a community observation include?", text: "Describe smoke, visible flames, or a burning smell, along with the time and approximate location. Distinguish where you are from where you think the incident is. Photos are optional—never move closer to get one." },
-  { title: "Does a satellite hotspot mean a confirmed fire?", text: "No. A hotspot is a detected thermal anomaly, not a confirmed fire. It needs context and human review. Equally, no satellite detections does not mean there is no fire risk." },
-  { title: "Does a report automatically send a response team?", text: "No. An observation does not confirm a fire or dispatch a team. Authorized people decide verification and response. Blazemap is not a replacement for local emergency services." },
-  { title: "Will my identity and photos be made public?", text: "A report and a public update are separate. Reporter identity and submitted photographs are not automatically published. Only reviewed information intended for public release should be shared." },
 ];
 
 export default function HomePage() {
@@ -62,7 +55,7 @@ export default function HomePage() {
               <ul className="mt-6 space-y-3 text-sm font-semibold">
                 {["What you noticed and when", "Where the signs appear to be", "A photo, only if it is safe"].map((text) => <li key={text} className="flex items-center gap-3"><Check size={16} strokeWidth={1.5} aria-hidden="true" className="shrink-0 text-primary" />{text}</li>)}
               </ul>
-              <a href="#guide" className="mt-7 inline-flex min-h-12 items-center gap-3 text-sm font-bold underline decoration-primary/35 underline-offset-8 hover:decoration-primary">Read the observation guide <ArrowUpRight size={17} aria-hidden="true" /></a>
+              <a href="/faq" className="mt-7 inline-flex min-h-12 items-center gap-3 text-sm font-bold underline decoration-primary/35 underline-offset-8 hover:decoration-primary">Read the FAQ <ArrowUpRight size={17} aria-hidden="true" /></a>
             </Reveal>
           </article>
 
@@ -85,25 +78,6 @@ export default function HomePage() {
               <p className="mt-6 max-w-[46ch] text-sm leading-7 text-muted-foreground">Submitting an observation does not automatically send a response team. Your identity and photos are not automatically made public.</p>
             </Reveal>
           </article>
-        </div>
-      </section>
-
-      <section id="guide" aria-labelledby="guide-title" className="relative isolate overflow-clip bg-white">
-        <ForestAccent />
-        <div className="relative z-10 mx-auto grid max-w-[1440px] gap-10 px-[clamp(40px,13vw,208px)] py-20 lg:grid-cols-[0.85fr_1.15fr] lg:gap-16 lg:py-24">
-          <Reveal>
-            <p className="mb-5 text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">A little clarity</p>
-            <h2 id="guide-title" className="text-[clamp(38px,4.2vw,58px)] leading-[1.13] font-extrabold tracking-[-0.04em]">Before you<br /><span className="text-primary">share a sign.</span></h2>
-            <p className="mt-6 max-w-[33ch] text-base leading-8 text-muted-foreground">A few things worth knowing about observations, verification, and your safety.</p>
-          </Reveal>
-          <Reveal className="border-t border-border">
-            {questions.map((question, index) => (
-              <details key={question.title} name="reporting-guide" className="group border-b border-border py-1" open={index === 0}>
-                <summary className="flex min-h-20 cursor-pointer list-none items-center justify-between gap-6 py-5 text-base font-bold leading-6 [&::-webkit-details-marker]:hidden">{question.title}<ChevronDown size={18} aria-hidden="true" className="shrink-0 transition-transform group-open:rotate-180" /></summary>
-                <p className="max-w-[60ch] pb-7 pr-6 text-[15px] leading-7 text-muted-foreground">{question.text}</p>
-              </details>
-            ))}
-          </Reveal>
         </div>
       </section>
 

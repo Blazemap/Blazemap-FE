@@ -2,17 +2,23 @@ import { useEffect, useRef, useState } from "react";
 import { Map, NavigationControl, AttributionControl, GeolocateControl, Marker, type GeoJSONSource } from "maplibre-gl";
 import { mapStyleUrl } from "@/config/map";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { Popover } from "radix-ui";
+import { Info, X } from "lucide-react";
 import { Button } from "@/components/ui";
 import { MapSkeleton } from "@/pages/dashboard/components/DashboardSkeletons";
 import { hasPoint, toGeoJSON } from "@/pages/dashboard/utils";
 import { flameImage } from "@/pages/dashboard/utils/flame";
-import type { MapItem } from "@/types";
-import { PerimeterDrawing, PublicPerimeters } from "./PerimeterMap";
+import type { CaseItem, MapItem, OwnReport } from "@/types";
+import { triageAppearance } from "@/lib/report-triage";
+import { reportStatusLabel } from "@/lib/report-status";
+import { PerimeterDrawing, PrivatePerimeters, PublicPerimeters } from "./PerimeterMap";
 import type { PerimeterEditorProps } from "./CasePerimeter";
 import type { WindArrow } from "@/lib/wind";
 import WindMap from "./WindMap";
+import type { GovernmentReport } from "@/types/government";
+import { mapPanelPadding } from "@/lib/dashboard";
 
-export default function SituationMap({ items, selected, draftLocation, onSelect, onPick, perimeterDraft = null, onPerimeterDraft, wind = null }: { wind?: WindArrow | null; perimeterDraft?: PerimeterEditorProps["draft"]; onPerimeterDraft?: PerimeterEditorProps["setDraft"]; items: MapItem[]; selected: MapItem | null; draftLocation?: { latitude: string; longitude: string } | null; onSelect: (id: string) => void; onPick?: (latitude: string, longitude: string) => void }) {
+export default function SituationMap({ place = null, focusPoint = null, items, selected, draftLocation, onSelect, onPick, perimeterDraft = null, onPerimeterDraft, wind = null, privateReports = [], selectedReport = null, onSelectReport, privateCases = [], selectedCaseId = null, onSelectCase, ownReports = [], selectedOwnReport = null, onSelectOwnReport }: { place?: import("@/lib/places").Place | null; focusPoint?: { latitude: number; longitude: number } | null; privateReports?: GovernmentReport[]; selectedReport?: GovernmentReport | null; onSelectReport?: (report: GovernmentReport) => void; privateCases?: CaseItem[]; selectedCaseId?: string | null; onSelectCase?: (id: string) => void; ownReports?: OwnReport[]; selectedOwnReport?: OwnReport | null; onSelectOwnReport?: (id: string) => void; wind?: WindArrow | null; perimeterDraft?: PerimeterEditorProps["draft"]; onPerimeterDraft?: PerimeterEditorProps["setDraft"]; items: MapItem[]; selected: MapItem | null; draftLocation?: { latitude: string; longitude: string } | null; onSelect: (id: string) => void; onPick?: (latitude: string, longitude: string) => void }) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map | null>(null);
   const latest = useRef({ items, onSelect, selected, onPick, draftLocation, perimeterDraft });
@@ -35,7 +41,7 @@ export default function SituationMap({ items, selected, draftLocation, onSelect,
       map.addControl(new AttributionControl({ compact: true }), "bottom-right");
       map.on("click", event => { if (!latest.current.perimeterDraft) latest.current.onPick?.(event.lngLat.lat.toFixed(6), event.lngLat.wrap().lng.toFixed(6)); });
       map.on("error", () => { if (!disposed) setState("error"); });
-      map.on("load", () => {
+      map.on("style.load", () => {
         if (disposed) return;
         clearTimeout(timeout);
         map.addSource("observations", { type: "geojson", data: toGeoJSON(latest.current.items), cluster: true, clusterRadius: 48, clusterMaxZoom: 13, clusterProperties: { hotspotCount: ["+", ["case", ["==", ["get", "kind"], "hotspot"], 1, 0]] } });
@@ -81,8 +87,11 @@ export default function SituationMap({ items, selected, draftLocation, onSelect,
   }, [attempt]);
   useEffect(() => {
     const map = mapRef.current;
-    (map?.getSource("observations") as GeoJSONSource | undefined)?.setData(toGeoJSON(items));
-  }, [items, state]);
+    let disposed = false;
+    const source = map?.getSource("observations") as GeoJSONSource | undefined;
+    void source?.setData(toGeoJSON(items)).then(() => { if (!disposed) map?.triggerRepaint(); }).catch(() => { if (!disposed) setState("error"); });
+    return () => { disposed = true; };
+  }, [items, state, readyMap]);
   useEffect(() => {
     const map = mapRef.current;
     const latitude = Number(draftLocation?.latitude), longitude = Number(draftLocation?.longitude);
@@ -125,32 +134,90 @@ export default function SituationMap({ items, selected, draftLocation, onSelect,
     const render = () => {
       markers.forEach(marker => marker.remove());
       markers = [];
+      if (latest.current.perimeterDraft) return;
       const visible = new Set(map.queryRenderedFeatures({ layers: ["points"] }).map(feature => feature.properties.id));
       for (const item of items) {
-        if (item.kind !== "publication" || item.verification !== "CONFIRMED_FIRE" || item.handling === "CLOSED" || !hasPoint(item) || !visible.has(item.id)) continue;
+        if (item.kind !== "publication" || !hasPoint(item) || !visible.has(item.id)) continue;
         const button = document.createElement("button");
         button.type = "button";
-        button.className = "grid size-11 place-items-center rounded-full border-2 border-white bg-orange-700 text-white shadow-lg motion-safe:animate-pulse";
-        button.setAttribute("aria-label", `Confirmed fire: ${item.title}. Published ${item.time}. Approved point, not a perimeter.`);
-        button.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2c1 5-4 6-4 10 0 1 .4 2 1 2-1-4 4-4 4-8 4 4 7 7 7 11a8 8 0 0 1-16 0c0-5 5-8 8-15Z"/></svg>';
+        button.className = "grid size-11 place-items-center rounded-full border-2 border-white bg-emerald-800 text-white shadow-lg";
+        button.setAttribute("aria-label", `Published report: ${item.title}. Published ${item.time}. Approved point, not a perimeter.`);
+        button.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/><path d="M9 7h6v7H9zM10 10h4"/></svg>';
         button.addEventListener("click", event => { event.stopPropagation(); if (latest.current.perimeterDraft) return; if (latest.current.onPick) latest.current.onPick(String(item.latitude), String(item.longitude)); else latest.current.onSelect(item.id); });
         markers.push(new Marker({ element: button }).setLngLat([item.longitude, item.latitude]).addTo(map));
       }
     };
-    map.on("idle", render);
+    map.on("moveend", render);
+    map.on("sourcedata", render);
     render();
-    return () => { map.off("idle", render); markers.forEach(marker => marker.remove()); };
-  }, [items, state]);
+    return () => { map.off("moveend", render); map.off("sourcedata", render); markers.forEach(marker => marker.remove()); };
+  }, [items, state, perimeterDraft]);
   useEffect(() => {
     const map = mapRef.current;
     (map?.getSource("selection") as GeoJSONSource | undefined)?.setData(toGeoJSON(selected ? [selected] : []));
-    if (map && selected && !latest.current.perimeterDraft && hasPoint(selected)) map.jumpTo({ center: [selected.longitude, selected.latitude], zoom: Math.max(map.getZoom(), 9), padding: { left: window.innerWidth >= 768 ? 424 : 0, right: 0, top: 100, bottom: 100 } });
+    if (map && selected && !latest.current.perimeterDraft && hasPoint(selected)) map.jumpTo({ center: [selected.longitude, selected.latitude], zoom: Math.max(map.getZoom(), 9), padding: mapPanelPadding() });
   }, [selected, state]);
+  useEffect(() => {
+    if (!readyMap || state !== "ready" || onPick) return;
+    const casesWithPerimeters = new Set(privateCases.filter(item => item.perimeter).map(item => item.id));
+    const markers = privateReports.filter(hasPoint).filter(report => {
+      const selectedMarker = selectedReport?.id === report.id;
+      return (selectedMarker && !!perimeterDraft) || !report.case?.id || !casesWithPerimeters.has(report.case.id);
+    }).map(report => {
+      const button = document.createElement("button");
+      button.type = "button";
+      const appearance = triageAppearance[report.triage.level];
+      const selectedMarker = selectedReport?.id === report.id;
+      button.className = `grid size-11 place-items-center rounded-full border-2 text-lg font-extrabold text-white shadow-lg ${selectedMarker ? "border-forest ring-4 ring-white/90" : "border-white"}`;
+      button.style.backgroundColor = appearance.color;
+      button.disabled = !!perimeterDraft;
+      const meaning = report.locationMode === "OBSERVER_POSITION" ? "Observer position, not incident location" : "Estimated incident location";
+      button.setAttribute("aria-label", `${report.number}. Review priority: ${appearance.label}. ${meaning}. ${perimeterDraft ? "Selected report location under boundary editor" : "Open private report review"}`);
+      button.title = `${report.number}: ${appearance.label} priority. ${meaning}`;
+      button.textContent = appearance.symbol;
+      button.addEventListener("click", event => { event.stopPropagation(); if (!perimeterDraft) onSelectReport?.(report); });
+      return new Marker({ element: button }).setLngLat([report.longitude, report.latitude]).addTo(readyMap);
+    });
+    return () => markers.forEach(marker => marker.remove());
+  }, [readyMap, state, privateReports, selectedReport, privateCases, onSelectReport, perimeterDraft, onPick]);
+  useEffect(() => {
+    if (!readyMap || state !== "ready" || perimeterDraft || onPick) return;
+    const publishedCaseNumbers = new Set(items.flatMap(item => item.publicPerimeter && item.caseNumber ? [item.caseNumber] : []));
+    const markers = ownReports.filter(hasPoint).filter(report => !report.case || !publishedCaseNumbers.has(report.case.number)).map(report => {
+      const button = document.createElement("button");
+      button.type = "button";
+      const selectedMarker = selectedOwnReport?.id === report.id;
+      button.className = `grid size-11 place-items-center rounded-full border-2 bg-orange-600 text-white shadow-lg ${selectedMarker ? "border-forest ring-4 ring-white/90" : "border-white"}`;
+      const meaning = report.locationMode === "OBSERVER_POSITION" ? "Observer position, not incident location" : "Estimated incident location";
+      button.setAttribute("aria-label", `Your report. ${reportStatusLabel(report)}. ${meaning}. Open report details`);
+      button.title = `Your report · ${reportStatusLabel(report)} · ${meaning}`;
+      button.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><path d="M8.5 7.5h7v5h-7z"/><path d="M10 10h4"/></svg>';
+      button.addEventListener("click", event => { event.stopPropagation(); onSelectOwnReport?.(report.id); });
+      return new Marker({ element: button }).setLngLat([report.longitude, report.latitude]).addTo(readyMap);
+    });
+    return () => markers.forEach(marker => marker.remove());
+  }, [readyMap, state, ownReports, selectedOwnReport, onSelectOwnReport, items, perimeterDraft, onPick]);
+  useEffect(() => {
+    if (readyMap && selectedReport && hasPoint(selectedReport) && !perimeterDraft) readyMap.jumpTo({ center: [selectedReport.longitude, selectedReport.latitude], zoom: Math.max(readyMap.getZoom(), 9), padding: mapPanelPadding() });
+  }, [readyMap, selectedReport, perimeterDraft]);
+  useEffect(() => {
+    if (readyMap && selectedOwnReport && hasPoint(selectedOwnReport) && !perimeterDraft) readyMap.jumpTo({ center: [selectedOwnReport.longitude, selectedOwnReport.latitude], zoom: Math.max(readyMap.getZoom(), 11), padding: mapPanelPadding() });
+  }, [readyMap, selectedOwnReport, perimeterDraft]);
+  useEffect(() => {
+    if (readyMap && focusPoint && !perimeterDraft) readyMap.jumpTo({ center: [focusPoint.longitude, focusPoint.latitude], zoom: Math.max(readyMap.getZoom(), 12), padding: mapPanelPadding() });
+  }, [readyMap, focusPoint, perimeterDraft]);
+  useEffect(() => {
+    if (!readyMap || !place || perimeterDraft || onPick) return;
+    const duration = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 800;
+    if (place.bbox) readyMap.fitBounds([[place.bbox[0], place.bbox[1]], [place.bbox[2], place.bbox[3]]], { padding: mapPanelPadding(), maxZoom: 14, duration });
+    else readyMap.flyTo({ center: [place.longitude, place.latitude], zoom: 11, padding: mapPanelPadding(), duration });
+  }, [readyMap, place, perimeterDraft, onPick]);
   return <div className="relative h-full min-h-0 bg-secondary">
     <div ref={container} aria-label="Situation map. All observations are also available in the results list. Flame counts are grouped satellite detections, not unique fires. Green counts are grouped observations." className="h-full w-full [&_.maplibregl-ctrl-attrib]:text-xs [&_.maplibregl-ctrl-group_button]:h-11 [&_.maplibregl-ctrl-group_button]:w-11" />
-    {state === "ready" && <details className="absolute bottom-24 left-4 z-10 max-w-[min(20rem,calc(100vw-6rem))] rounded-sm border border-primary/10 bg-white text-xs leading-5 text-forest shadow-sm"><summary className="min-h-11 cursor-pointer px-3 py-3 font-bold focus-visible:outline-2 focus-visible:outline-primary">Map info</summary><div className="space-y-2 border-t border-primary/10 px-3 py-3"><p>Flame counts show grouped satellite detections, not unique fires.</p><p>Green counts group published updates or a mix of updates and satellite detections.</p><p>Individual flame size reflects radiative power (MW), not the size of a burned area. Satellite detections are not confirmed fires.</p></div></details>}
+    {state === "ready" && <div className="absolute bottom-24 left-4 z-10"><Popover.Root><Popover.Trigger asChild><button type="button" className="flex min-h-11 items-center gap-2 rounded-sm border border-primary/10 bg-white px-3 py-2 text-xs font-bold text-forest shadow-sm hover:bg-secondary focus-visible:outline-2 focus-visible:outline-primary"><Info size={16} aria-hidden="true" />Map info</button></Popover.Trigger><Popover.Portal><Popover.Content side="top" align="start" sideOffset={8} collisionPadding={16} className="z-[80] max-h-[min(30rem,calc(100dvh-8rem))] w-[min(20rem,calc(100vw-2rem))] overflow-y-auto rounded-sm border border-primary/10 bg-white p-4 text-xs leading-5 text-forest shadow-2xl"><div className="flex items-center justify-between gap-3"><h2 className="font-extrabold">Map info</h2><Popover.Close asChild><button type="button" aria-label="Close map info" className="grid size-10 place-items-center rounded-full hover:bg-secondary"><X size={16} aria-hidden="true" /></button></Popover.Close></div><div className="mt-2 space-y-2 border-t border-primary/10 pt-3"><p>Green document pins and approved boundaries are published reports.</p>{onSelectOwnReport && <p><span aria-hidden="true" className="mr-1 inline-block size-3 rounded-full bg-orange-600 align-[-1px]" />Orange location pins are your reports. Their labels distinguish observer positions from incident estimates.</p>}{onSelectReport && <section aria-label="Private report priority legend"><p>Private report priority, not fire confirmation. Marker labels distinguish observer positions from incident estimates.</p><ul>{Object.entries(triageAppearance).map(([level, appearance]) => <li key={level} className="flex items-center gap-2"><span aria-hidden="true" className="grid size-5 place-items-center rounded-full font-bold text-white" style={{ backgroundColor: appearance.color }}>{appearance.symbol}</span>{appearance.label}</li>)}</ul></section>}<p>Flame counts show grouped satellite detections, not unique fires.</p><p>Green counts group published updates or a mix of updates and satellite detections.</p><p>Individual flame size reflects radiative power (MW), not the size of a burned area. Satellite detections are not confirmed fires.</p></div></Popover.Content></Popover.Portal></Popover.Root></div>}
     {state === "ready" && readyMap && wind && !onPick && <WindMap map={readyMap} wind={wind} />}
     {state === "ready" && readyMap && <PublicPerimeters map={readyMap} items={items} selected={selected} blocked={!!onPick || !!perimeterDraft} onSelect={onSelect} />}
+    {state === "ready" && readyMap && onSelectCase && <PrivatePerimeters map={readyMap} cases={privateCases} selectedCaseId={selectedCaseId} blocked={!!onPick || !!perimeterDraft} onSelect={onSelectCase} />}
     {state === "ready" && readyMap && perimeterDraft && onPerimeterDraft && !onPick && <PerimeterDrawing map={readyMap} draft={perimeterDraft} setDraft={onPerimeterDraft} />}
     {state === "loading" && <div className="absolute inset-0 z-10"><MapSkeleton /></div>}
     {state === "error" && <div role="alert" className="absolute bottom-24 left-4 right-20 z-10 max-w-sm rounded-xl border bg-white p-4 text-sm shadow-sm"><p className="font-bold">Map unavailable</p><p className="mt-1 text-muted-foreground">Tiles or map rendering could not load. The results list is still available.</p><Button variant="outline" className="mt-3" onClick={() => { setState("loading"); setAttempt((v) => v + 1); }}>Retry map</Button></div>}

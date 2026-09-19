@@ -3,6 +3,7 @@ export { default as governmentForest } from "./images/government-forest.webp";
 export { default as loginForest } from "./images/login-forest.webp";
 export { default as registerForest } from "./images/register-forest.webp";
 export { default as contactForest } from "./images/contact-forest.webp";
+export { default as faqForest } from "./images/faq-forest.webp";
 export { default as foreground } from "./images/foreground.webp";
 export { default as fernLayer } from "./images/fern-layer.webp";
 export { default as rainforest } from "./images/rainforest.webp";

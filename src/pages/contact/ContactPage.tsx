@@ -40,7 +40,7 @@ export default function ContactPage() {
           </dl>
 
           <Button asChild className="mt-7 min-h-12 font-bold">
-            <a href="/#guide">Read the guide <ArrowUpRight size={17} aria-hidden="true" /></a>
+            <a href="/faq">Read the FAQ <ArrowUpRight size={17} aria-hidden="true" /></a>
           </Button>
         </motion.div>
 

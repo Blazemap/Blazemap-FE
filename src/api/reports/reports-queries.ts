@@ -15,14 +15,14 @@ async function request<T>(path: string, signal?: AbortSignal, body?: unknown): P
     return response.data;
   } catch (error) { throw new ReportError(isAxiosError(error) ? error.response?.status : 0); }
 }
-export async function requireReportAccount(user: DashboardUser) {
-  const current = await getSharedAccount();
+export async function requireReportAccount(user: DashboardUser, fresh = false) {
+  const current = await getSharedAccount(fresh);
   if (current.id !== user.id || current.role !== user.role) throw new ReportError(403);
 }
-export function reportsQueryOptions(user: DashboardUser, page: number) {
-  return { queryKey: queryKeys.dashboard.reports(user, page), gcTime: 0, queryFn: async ({ signal }: { signal: AbortSignal }) => {
+export function reportsQueryOptions(user: DashboardUser, page: number, pageSize = 20) {
+  return { queryKey: queryKeys.dashboard.reports(user, page, pageSize), gcTime: 0, queryFn: async ({ signal }: { signal: AbortSignal }) => {
     await requireReportAccount(user);
-    const result = await request<ReportList>(`${apiEndpoints.reports}?page=${page}&pageSize=20`, signal);
+    const result = await request<ReportList>(`${apiEndpoints.reports}?page=${page}&pageSize=${pageSize}`, signal);
     await requireReportAccount(user);
     signal.throwIfAborted();
     return result;
@@ -69,9 +69,13 @@ export async function uploadPhoto(user: DashboardUser, photo: ReportPhoto, updat
   update({ id, progress: 100, error: undefined });
   return id;
 }
-export async function downloadPhoto(user: DashboardUser, id: string) {
-  await requireReportAccount(user);
-  const result = await request<{ data: { url: string } }>(`${apiEndpoints.uploads}/${encodeURIComponent(id)}/download`);
+export async function downloadPhoto(user: DashboardUser, id: string, signal?: AbortSignal) {
+  signal?.throwIfAborted();
+  await requireReportAccount(user, true);
+  signal?.throwIfAborted();
+  const result = await request<{ data: { url: string } }>(`${apiEndpoints.uploads}/${encodeURIComponent(id)}/download`, signal);
+  await requireReportAccount(user, true);
+  signal?.throwIfAborted();
   const url = new URL(result.data.url);
   if (url.protocol !== "https:" || url.username || url.password) throw new ReportError(502);
   return url.href;
