@@ -130,7 +130,7 @@ export function AuthForm({ mode, portal = "citizen" }: { mode: AuthMode; portal?
       <p role="status" className={notice ? "mt-3 text-sm leading-6 text-primary" : "sr-only"}>{notice}</p>
       {phase === "form" && (
         <>
-          <Button type="button" variant="outline" onClick={() => { void startGoogle(); }} disabled={isPending || googleState !== "available"} aria-describedby={googleState !== "available" ? "google-availability" : undefined} className="mt-5 h-11 w-full rounded-lg bg-card font-bold">
+          <Button type="button" variant="outline" onClick={() => { void startGoogle(); }} disabled={isPending || googleState !== "available"} aria-describedby={googleState !== "available" ? "google-availability" : undefined} className="mt-5 h-11 w-full rounded-lg bg-card font-bold text-black">
             <GoogleMark />Continue with Google
           </Button>
           {googleState !== "available" && <p id="google-availability" className="mt-1 text-center text-xs leading-4 text-muted-foreground">{googleState === "checking" ? "Checking Google availability…" : "Google login is unavailable. Use email below."}</p>}

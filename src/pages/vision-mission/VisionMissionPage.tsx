@@ -58,7 +58,7 @@ export default function VisionMissionPage() {
         >
           <h1 id="vision-title" className="max-w-[13ch] text-[clamp(48px,7vw,94px)] font-extrabold leading-[0.98] tracking-[-0.055em]">
             <span className="block">Clarity for every sign.</span>
-            <span className="mt-4 block leading-[1.2]"><span className="box-decoration-clone bg-background px-2 text-primary">Care for every forest.</span></span>
+            <span className="mt-4 block leading-[1.2] text-white">Care for every forest.</span>
           </h1>
           <p className="mt-7 max-w-[58ch] text-base leading-8 text-white/82 sm:text-lg">
             Our vision is a Kalimantan where forest and land fire information is credible, traceable, and useful. Communities and authorized teams can act with better context, not assumptions.

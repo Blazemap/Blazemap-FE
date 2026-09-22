@@ -39,11 +39,11 @@ export function AccountMenu({ user, showWorkspaceLinks = true }: { user: Dashboa
       </DropdownMenu.Content></DropdownMenu.Portal>
     </DropdownMenu.Root>
     <AlertDialog.Root open={isConfirmOpen} onOpenChange={(open) => { if (!isPending) setConfirmOpen(open); }}>
-      <AlertDialog.Portal><AlertDialog.Overlay className="fixed inset-0 z-[80] bg-forest/40" /><AlertDialog.Content data-lenis-prevent className="fixed left-1/2 top-1/2 z-[90] w-[calc(100%_-_32px)] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-2xl border bg-white p-6 text-forest shadow-2xl" onEscapeKeyDown={(event) => { if (isPending) event.preventDefault(); }} onCloseAutoFocus={(event) => { event.preventDefault(); trigger.current?.focus(); }}>
+      <AlertDialog.Portal><AlertDialog.Overlay className="fixed inset-0 z-[80] bg-black/40" /><AlertDialog.Content data-lenis-prevent className="fixed left-1/2 top-1/2 z-[90] w-[calc(100%_-_32px)] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-neutral-200 bg-white p-6 text-black shadow-2xl" onEscapeKeyDown={(event) => { if (isPending) event.preventDefault(); }} onCloseAutoFocus={(event) => { event.preventDefault(); trigger.current?.focus(); }}>
         <AlertDialog.Title className="text-xl font-extrabold">Logout?</AlertDialog.Title>
-        <AlertDialog.Description className="mt-2 break-words text-sm leading-6 text-muted-foreground">Log out of {user.email}? You can log in again anytime.</AlertDialog.Description>
-        {error && <p role="alert" className="mt-4 text-sm text-red-800">{error}</p>}
-        <div className="mt-6 flex justify-end gap-2"><AlertDialog.Cancel asChild><Button variant="outline" disabled={isPending}>Cancel</Button></AlertDialog.Cancel><AlertDialog.Action asChild><Button disabled={isPending} aria-busy={isPending} onClick={(event) => { event.preventDefault(); void handleLogout(); }}>{isPending ? "Logging out…" : "Logout"}</Button></AlertDialog.Action></div>
+        <AlertDialog.Description className="mt-2 break-words text-sm leading-6 text-neutral-600">Log out of {user.email}? You can log in again anytime.</AlertDialog.Description>
+        {error && <p role="alert" className="mt-4 text-sm text-neutral-700">{error}</p>}
+        <div className="mt-6 flex justify-end gap-2"><AlertDialog.Cancel asChild><Button variant="outline" className="border-neutral-300 text-black hover:bg-neutral-100 focus-visible:outline-black" disabled={isPending}>Cancel</Button></AlertDialog.Cancel><AlertDialog.Action asChild><Button className="bg-black text-white hover:bg-neutral-800 focus-visible:outline-black" disabled={isPending} aria-busy={isPending} onClick={(event) => { event.preventDefault(); void handleLogout(); }}>{isPending ? "Logging out…" : "Logout"}</Button></AlertDialog.Action></div>
       </AlertDialog.Content></AlertDialog.Portal>
     </AlertDialog.Root>
   </>;
