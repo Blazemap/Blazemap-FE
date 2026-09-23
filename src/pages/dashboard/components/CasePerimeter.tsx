@@ -1,4 +1,4 @@
-import { useState, type Dispatch, type SetStateAction } from "react";
+import { useContext, useState, type Dispatch, type SetStateAction } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Button, FieldLength, FieldSelect } from "@/components/ui";
 import type { DashboardUser } from "@/types";
@@ -7,26 +7,29 @@ import { drawingFrom, drawingPolygon, editDraft, polygonArea, type PerimeterDraf
 import { savePerimeter, verifyGovernmentCase } from "@/api/dashboard/government";
 import { useGovernmentMutation } from "@/hooks/dashboard/useGovernment";
 import { formatTime } from "@/pages/dashboard/utils";
+import { ReportAssociationContext } from "@/lib/report-association";
 
 export type PerimeterEditorProps = { draft: PerimeterDraft | null; setDraft: Dispatch<SetStateAction<PerimeterDraft | null>> };
 const control = "mt-1 min-h-11 w-full rounded-lg border border-input bg-white px-3 text-sm";
 const localTime = (value: string | null) => value ? new Date(Date.parse(value) - new Date(value).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
 export default function CasePerimeter({ user, detail, draft, setDraft, refresh, canDraw }: PerimeterEditorProps & { user: DashboardUser; detail: CaseDetail; refresh: () => void; canDraw: boolean }) {
   const reducedMotion = useReducedMotion();
+  const reportPicker = useContext(ReportAssociationContext);
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
   const [coordinateError, setCoordinateError] = useState("");
   const [ownerMessage, setOwnerMessage] = useState("");
-  const mutation = useGovernmentMutation(user, async (input: PerimeterDraft) => {
+  const mutation = useGovernmentMutation(user, async ({ input, relatedReportIds }: { input: PerimeterDraft; relatedReportIds: string[] }) => {
     const selectedField = detail.fieldUpdates.find(field => field.id === input.confirmation?.fieldUpdateId);
     const observed = new Date(input.confirmation?.reuseFieldObservation ? selectedField?.observedAt ?? "" : input.observedAt);
     if (!Number.isFinite(observed.getTime()) || observed.getTime() > Date.now()) throw new Error("Enter the actual perimeter observation time, not a future time.");
     if (input.version !== detail.version) throw new Error("Case changed. Refresh and review before saving.");
     const perimeter = drawingPolygon(input.drawing);
+    if (relatedReportIds.length) await reportPicker.validateCaseSelection(relatedReportIds);
     if (input.confirmation) {
       if (detail.fieldUpdates.find(field => field.id === input.confirmation!.fieldUpdateId)?.findings !== "VISIBLE_FIRE") throw new Error("Recorded visible-fire evidence is required.");
-      await verifyGovernmentCase(detail.id, { outcome: "CONFIRMED_FIRE", decisionNote: input.reason.trim(), observationId: input.confirmation.fieldUpdateId, version: input.version, perimeter, boundaryUsesObservationSourceTime: input.confirmation.reuseFieldObservation === true, ...(input.confirmation.reuseFieldObservation ? {} : { perimeterObservedAt: observed.toISOString(), perimeterSource: input.source.trim() }) });
-    } else await savePerimeter(detail.id, { version: input.version, perimeter, perimeterObservedAt: observed.toISOString(), perimeterSource: input.source.trim(), reason: input.reason.trim(), authorityReference: input.authority.trim(), reporterMessage: ownerMessage.trim() });
+      await verifyGovernmentCase(detail.id, { outcome: "CONFIRMED_FIRE", decisionNote: input.reason.trim(), observationId: input.confirmation.fieldUpdateId, version: input.version, relatedReportIds, perimeter, boundaryUsesObservationSourceTime: input.confirmation.reuseFieldObservation === true, ...(input.confirmation.reuseFieldObservation ? {} : { perimeterObservedAt: observed.toISOString(), perimeterSource: input.source.trim() }) });
+    } else await savePerimeter(detail.id, { version: input.version, relatedReportIds, perimeter, perimeterObservedAt: observed.toISOString(), perimeterSource: input.source.trim(), reason: input.reason.trim(), authorityReference: input.authority.trim(), reporterMessage: ownerMessage.trim() });
   }, "canConfirmIncidents", "Case confirmation or boundary saved");
   const active = draft?.caseId === detail.id ? draft : null;
   let validation = "", hectares: number | null = null;
@@ -51,8 +54,9 @@ export default function CasePerimeter({ user, detail, draft, setDraft, refresh, 
       event.preventDefault();
       if (validation || active.version !== detail.version || active.pending) return;
       const snapshot = active;
+      const relatedReportIds = [...reportPicker.selectedIds];
       setDraft(current => current ? { ...current, pending: true } : current);
-      mutation.mutate(snapshot, { onSuccess: () => setDraft(null), onSettled: () => setDraft(current => current ? { ...current, pending: false } : current) });
+      mutation.mutate({ input: snapshot, relatedReportIds }, { onSuccess: () => { setDraft(null); if (relatedReportIds.length) reportPicker.clearCase(); }, onSettled: () => setDraft(current => current ? { ...current, pending: false } : current) });
     }}><fieldset disabled={active.pending} className="space-y-3"><legend className="text-sm font-bold">Unsaved drawing</legend>
       <p className="text-xs">{detail.perimeter && !active.confirmation ? `Revision ${detail.perimeterRevision + 1} starts from the saved ring. ` : ""}Click the map to add at least three vertices, then click the first to close. Drag vertices or use coordinates. The saved boundary remains current until this revision succeeds.</p>
       <label htmlFor="perimeter-ring" className="block text-xs font-bold">Ring <span aria-hidden="true">*</span><FieldSelect id="perimeter-ring" required disabled={active.pending} value={String(active.drawing.active)} onValueChange={value => setDraft(current => current ? editDraft(current, { type: "ring", index: Number(value) }) : current)} options={active.drawing.rings.map((_, i) => ({ value: String(i), label: i === 0 ? "Outer boundary" : `Hole ${i}` }))} /></label>

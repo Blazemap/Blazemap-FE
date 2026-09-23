@@ -4,7 +4,7 @@ import { queryKeys } from "@/api/queryKeys";
 import type { DashboardUser, ReportPayload } from "@/types";
 
 export function useQueryGetReports(user: DashboardUser, page: number, pageSize = 20, enabled = true) { return useQuery({ ...reportsQueryOptions(user, page, pageSize), enabled, retry: false }); }
-export function useQueryGetReport(user: DashboardUser, id: string) { return useQuery({ ...reportQueryOptions(user, id), retry: false }); }
+export function useQueryGetReport(user: DashboardUser, id: string, enabled = true) { return useQuery({ ...reportQueryOptions(user, id), enabled, retry: false }); }
 export function useQueryGetRegions(search: string) { return useQuery({ ...regionsQueryOptions(search), retry: false }); }
 export function useMutationCreateReport(user: DashboardUser) {
   const client = useQueryClient();

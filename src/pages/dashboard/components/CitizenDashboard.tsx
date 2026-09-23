@@ -3,6 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import NewsFeed from "./NewsFeed";
 import WarningBanner from "./WarningBanner";
 import { usePublicationMap } from "@/hooks/dashboard/usePublicationMap";
+import { useQueryGetReport } from "@/hooks/reports/useReports";
 import MapLayers from "./MapLayers";
 import { Check, Crosshair, ListFilter, Plus, X } from "lucide-react";
 import { useLocation, useSearchParams } from "react-router-dom";
@@ -51,14 +52,18 @@ export function CitizenDashboard({ user }: { user: DashboardUser }) {
   const loaded = useQueryGetMap(user, hours);
   const data = useMemo(() => loaded.data ? ageMap(loaded.data, loaded.now) : null, [loaded.data, loaded.now]);
   const ownReports = data?.ownReports ?? [];
+  const reportId = params.get("report");
+  const selectedReportQuery = useQueryGetReport(user, reportId ?? "", !!reportId);
+  const selectedReport = selectedReportQuery.data?.id === reportId ? selectedReportQuery.data : null;
+  const mapReports = selectedReport && !ownReports.some(report => report.id === selectedReport.id) ? [...ownReports, selectedReport] : ownReports;
   const mapItems = useMemo(() => filterMap(data?.items ?? [], "", publications, hotspots), [data?.items, hotspots, publications]);
   const feedItems = useMemo(() => filterMap(data?.items ?? [], "", true, false), [data?.items]);
   const publication = usePublicationMap(user, params.get("publication"));
   const baseItems = feed ? feedItems : mapItems;
   const ownCaseNumbers = new Set(ownReports.flatMap(report => report.case ? [report.case.number] : []));
-  const items = (publication.item && publications ? [...baseItems.filter(item => item.id !== publication.item!.id), publication.item] : baseItems).filter(item => !item.caseNumber || !ownCaseNumbers.has(item.caseNumber));
-  const selected = items.find(item => item.id === (publications ? publication.item?.id : null)) ?? items.find(item => item.id === params.get("observation")) ?? null;
-  const selectedOwnReport = ownReports.find(report => report.id === params.get("report")) ?? null;
+  const items = (publication.item ? [...baseItems.filter(item => item.id !== publication.item!.id), publication.item] : baseItems).filter(item => !item.caseNumber || !ownCaseNumbers.has(item.caseNumber));
+  const selected = publication.item ?? items.find(item => item.id === params.get("observation")) ?? null;
+  const selectedOwnReport = mapReports.find(report => report.id === reportId) ?? null;
   const availability = mapAvailability(data, loaded.failed);
   const [showInitialAvailability, setShowInitialAvailability] = useState(true);
 
@@ -120,7 +125,7 @@ export function CitizenDashboard({ user }: { user: DashboardUser }) {
   function selectItem(id: string) {
     if (reportPending || pick || (!desktop && (reportOpen || detailDraft.pending))) return;
     if (!desktop && detailDraft.dirty && !window.confirm("Discard unsaved report changes?")) return;
-    updateParams(next => { next.set("observation", id); next.delete("publication"); if (!desktop) { if (next.get("panel") === "my-reports") next.delete("panel"); next.delete("my-reports"); } });
+    updateParams(next => { next.set("observation", id); next.delete("publication"); next.delete("report"); if (!desktop) { if (next.get("panel") === "my-reports") next.delete("panel"); next.delete("my-reports"); } });
   }
   function selectOwnReport(id: string) {
     if (reportPending || pick || detailDraft.pending) return;
@@ -142,7 +147,7 @@ export function CitizenDashboard({ user }: { user: DashboardUser }) {
     <h1 className="sr-only">{feed ? "Published updates" : "Blazemap dashboard"}</h1>
     <WorkspaceNav user={user}>{mobileControls}</WorkspaceNav>
 
-    {!feed && <section aria-label="Situation map" className="absolute inset-0">{loaded.initialLoading && !loaded.data ? <MapSkeleton /> : <Suspense fallback={<MapSkeleton />}><SituationMap place={place} items={items} selected={selected} draftLocation={pick ?? reportLocation} onSelect={selectItem} onPick={pick ? (latitude, longitude) => setPick(current => current ? { ...current, latitude, longitude } : null) : undefined} ownReports={publications ? ownReports : []} selectedOwnReport={selectedOwnReport} onSelectOwnReport={selectOwnReport} /></Suspense>}</section>}
+    {!feed && <section aria-label="Situation map" className="absolute inset-0">{loaded.initialLoading && !loaded.data ? <MapSkeleton /> : <Suspense fallback={<MapSkeleton />}><SituationMap place={place} items={items} selected={selected} draftLocation={pick ?? reportLocation} onSelect={selectItem} onPick={pick ? (latitude, longitude) => setPick(current => current ? { ...current, latitude, longitude } : null) : undefined} ownReports={publications ? mapReports : selectedOwnReport ? [selectedOwnReport] : []} selectedOwnReport={selectedOwnReport} onSelectOwnReport={selectOwnReport} /></Suspense>}</section>}
 
     {feed && <NewsFeed key={hours} user={user} news={false} hours={hours} />}
     {!feed && !pick && !reportOpen && !myReportsOpen && !selected && <div className="absolute bottom-24 right-4 z-20 w-[min(360px,calc(100%-32px))]"><WarningBanner user={user} /></div>}

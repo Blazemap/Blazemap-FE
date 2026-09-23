@@ -11,4 +11,12 @@ export const ReportAssociationContext = createContext<{
   available: boolean;
   start: (pick: ReportAssociationPick) => void;
   cancel: () => void;
-}>({ activeSourceId: null, available: false, start: () => undefined, cancel: () => undefined });
+  caseId: string | null;
+  selectedIds: ReadonlySet<string>;
+  selectedReports: { id: string; number: string }[];
+  toggleCaseReport: (reportId: string) => void;
+  startCase: (caseId: string) => void;
+  finishCase: () => void;
+  clearCase: () => void;
+  validateCaseSelection: (reportIds: string[]) => Promise<void>;
+}>({ activeSourceId: null, available: false, start: () => undefined, cancel: () => undefined, caseId: null, selectedIds: new Set(), selectedReports: [], toggleCaseReport: () => undefined, startCase: () => undefined, finishCase: () => undefined, clearCase: () => undefined, validateCaseSelection: async () => undefined });

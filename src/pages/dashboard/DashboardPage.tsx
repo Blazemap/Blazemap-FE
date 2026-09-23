@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { Link, useLoaderData, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { FileText, FolderOpen, List, RefreshCw, ShieldCheck } from "lucide-react";
 import { usePublicationMap } from "@/hooks/dashboard/usePublicationMap";
+import { getGovernmentReport } from "@/api/dashboard/government";
 import MapLayers from "./components/MapLayers";
 import CaseQueue from "./components/CaseQueue";
 import { foreground } from "@/assets";
@@ -32,6 +33,7 @@ import { pageTitle } from "@/lib/page-title";
 import { ageMap, filterMap, formatTime, mapAvailability, hasPoint } from "@/pages/dashboard/utils";
 
 const SituationMap = lazy(() => import("@/pages/dashboard/components/SituationMap"));
+const emptyReportSelection: ReadonlySet<string> = new Set();
 
 export function Component() {
   const user = useLoaderData() as DashboardUser;
@@ -45,6 +47,8 @@ export function Component() {
 function Workspace({ user }: { user: DashboardUser }) {
   const [incidentPick, setIncidentPick] = useState<IncidentPick | null>(null);
   const [associationPick, setAssociationPick] = useState<ReportAssociationPick | null>(null);
+  const [caseReportPick, setCaseReportPick] = useState<string | null>(null);
+  const [caseReportDraft, setCaseReportDraft] = useState<{ caseId: string; ids: Set<string> } | null>(null);
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
@@ -57,6 +61,7 @@ function Workspace({ user }: { user: DashboardUser }) {
   const [hotspots, setHotspots] = useState(true);
   const [operations, setOperations] = useState(false);
   const caseId = params.get("case");
+  const caseReportIds = caseReportDraft?.caseId === caseId ? caseReportDraft.ids : emptyReportSelection;
   const selectedCase = useGovernmentCase(user, caseId ?? "");
   const newsCase = useGovernmentCase(user, newsCaseId ?? "");
   const [caseDraft, setCaseDraft] = useState({ dirty: false, pending: false });
@@ -71,18 +76,19 @@ function Workspace({ user }: { user: DashboardUser }) {
   const [perimeterDraft, setPerimeterDraft] = useState<PerimeterDraft | null>(null);
   const [wind, setWind] = useState<WindArrow | null>(null);
   const [reportStatus, setReportStatus] = useState("");
-  const [reportId, setReportId] = useState<string | null>(() => params.get("report"));
+  const [reportId, setReportId] = useState<string | null>(null);
+  const selectedReportId = params.get("report") ?? reportId;
   const [feedReportId, setFeedReportId] = useState<string | null>(() => feed ? params.get("feed-report") : null);
   const feedScrollRef = useRef<HTMLElement>(null);
   const feedScrollTop = useRef(0);
   const [reviewDraft, setReviewDraft] = useState({ dirty: false, pending: false });
   const onDraft = useCallback((dirty: boolean, pending: boolean) => setReviewDraft({ dirty, pending }), []);
   const internalFeed = useGovernmentReports(user, "", feed ? "" : reportStatus, feed ? 10 : 20);
-  const reportDetail = useGovernmentReport(user, reportId);
+  const reportDetail = useGovernmentReport(user, selectedReportId);
   const feedReportDetail = useGovernmentReport(user, feedReportId);
   const reportTotal = internalFeed.data?.meta.total ?? 0;
   const authorizedReports = internalFeed.forbidden ? [] : internalFeed.data?.data ?? [];
-  const report = reportDetail.forbidden || internalFeed.forbidden ? null : reportDetail.data ?? authorizedReports.find(item => item.id === reportId) ?? null;
+  const report = reportDetail.forbidden || internalFeed.forbidden ? null : reportDetail.data ?? authorizedReports.find(item => item.id === selectedReportId) ?? null;
   const feedReport = feedReportDetail.forbidden || internalFeed.forbidden ? null : feedReportDetail.data ?? null;
   const reportCase = useGovernmentCase(user, report?.case?.id ?? "");
   const feedReportCase = useGovernmentCase(user, feedReport?.case?.id ?? "");
@@ -97,13 +103,14 @@ function Workspace({ user }: { user: DashboardUser }) {
   }, [data?.privateCases, selectedCase.data, caseStatus]);
   const mapItems = useMemo(() => filterMap(governmentPublicItems(data?.items ?? [], privateCases), "", feed || publications, !feed && hotspots), [data?.items, feed, publications, hotspots, privateCases]);
   const mapReports = useMemo(() => {
+    if (caseReportPick) return (data?.privateReports ?? []).filter(item => !item.case && item.reviewStatus === "REVIEWED" && item.locationMode === "INCIDENT_ESTIMATE" && hasPoint(item));
     if (associationPick) return (data?.privateReports ?? []).filter(item => item.id !== associationPick.sourceId && item.locationMode === "INCIDENT_ESTIMATE" && (!item.case || item.case.handlingStatus !== "CLOSED" && item.case.verificationStatus !== "NOT_FIRE"));
     const markers = privateReportMarkers(data?.privateReports ?? [], privateCases);
-    if (!perimeterDraft || !report || perimeterDraft.caseId !== `report:${report.id}` || markers.some(item => item.id === report.id)) return markers;
+    if (!report || !hasPoint(report) || markers.some(item => item.id === report.id)) return markers;
     return [...markers, report];
-  }, [associationPick, data?.privateReports, privateCases, perimeterDraft, report]);
+  }, [associationPick, caseReportPick, data?.privateReports, privateCases, report]);
   const publication = usePublicationMap(user, params.get("publication"));
-  const items = publication.item && (feed || publications) ? [...mapItems.filter(item => item.id !== publication.item!.id), publication.item] : mapItems;
+  const items = publication.item ? [...mapItems.filter(item => item.id !== publication.item!.id), publication.item] : mapItems;
   const selected = publication.item ?? items.find(item => item.id === params.get("observation")) ?? null;
   const availability = mapAvailability(data, loaded.failed);
   const [showInitialAvailability, setShowInitialAvailability] = useState(true);
@@ -119,20 +126,29 @@ function Workspace({ user }: { user: DashboardUser }) {
     return () => media.removeEventListener("change", update);
   }, []);
   function discardReview() {
-    if (incidentPick || reviewDraft.pending || caseDraft.pending || perimeterDraft) return false;
-    return !(reviewDraft.dirty || caseDraft.dirty) || window.confirm("Discard unsaved detail changes?");
+    if (incidentPick || caseReportPick || reviewDraft.pending || caseDraft.pending || perimeterDraft) return false;
+    if (!(reviewDraft.dirty || caseDraft.dirty || caseReportIds.size > 0)) return true;
+    const discard = window.confirm("Discard unsaved detail changes?");
+    if (discard && caseReportIds.size) setCaseReportDraft(null);
+    return discard;
   }
-  function clearSelection() { setParams(current => { const next = new URLSearchParams(current); next.delete("observation"); next.delete("case"); next.delete("publication"); next.delete("report"); return next; }, { replace: true }); }
+  function clearSelection() { setCaseReportPick(null); setCaseReportDraft(null); setParams(current => { const next = new URLSearchParams(current); next.delete("observation"); next.delete("case"); next.delete("publication"); next.delete("report"); return next; }, { replace: true }); }
   function select(id: string) {
     if (!discardReview()) return;
     setReportId(null);
-    setParams(current => { const next = new URLSearchParams(current); next.set("observation", id); next.delete("case"); next.delete("publication"); return next; }, { replace: true });
+    setParams(current => { const next = new URLSearchParams(current); next.set("observation", id); next.delete("case"); next.delete("publication"); next.delete("report"); return next; }, { replace: true });
     if (!desktop) { setWorklistOpen(false); setCasesOpen(false); }
   }
   function selectReport(value: GovernmentReport) {
+    if (caseReportPick) {
+      if (loaded.failed || caseReportPick !== caseId || value.case || value.reviewStatus !== "REVIEWED" || value.locationMode !== "INCIDENT_ESTIMATE") return false;
+      setCaseReportDraft(current => { const next = new Set(current?.caseId === caseReportPick ? current.ids : []); if (next.has(value.id)) next.delete(value.id); else next.add(value.id); return { caseId: caseReportPick, ids: next }; });
+      return true;
+    }
     if (associationPick) { associationPick.apply(value); setAssociationPick(null); return true; }
     if (!discardReview()) return false;
     if (!feed) clearSelection();
+    else setParams(current => { const next = new URLSearchParams(current); next.delete("report"); return next; }, { replace: true });
     setReportId(value.id);
     setFocusPoint(hasPoint(value) ? { latitude: value.latitude, longitude: value.longitude } : null);
     if (!desktop) { setWorklistOpen(false); setCasesOpen(false); }
@@ -140,15 +156,16 @@ function Workspace({ user }: { user: DashboardUser }) {
   }
   function selectCase(id: string) {
     if (!discardReview()) return;
+    if (id !== caseId) { setCaseReportPick(null); setCaseReportDraft(null); }
     setReportId(null);
-    setParams(current => { const next = new URLSearchParams(current); next.set("case", id); next.delete("observation"); next.delete("publication"); return next; }, { replace: true });
+    setParams(current => { const next = new URLSearchParams(current); next.set("case", id); next.delete("observation"); next.delete("publication"); next.delete("report"); return next; }, { replace: true });
     if (!desktop) { setWorklistOpen(false); setCasesOpen(false); }
   }
   function viewReport(value: GovernmentReport) {
     if (!selectReport(value)) return;
     setFeedReportId(null);
     const next = new URLSearchParams(params);
-    next.delete("observation"); next.delete("case"); next.delete("publication"); next.delete("view"); next.delete("feed-report");
+    next.delete("observation"); next.delete("case"); next.delete("publication"); next.delete("report"); next.delete("view"); next.delete("feed-report");
     navigate(`/dashboard?${next.toString()}`, { replace: true });
   }
   function openFeedReport(value: GovernmentReport) {
@@ -191,12 +208,12 @@ function Workspace({ user }: { user: DashboardUser }) {
   </div>;
   const reportDrawing = perimeterDraft?.caseId === `report:${report?.id}`;
   const detail = caseId ? <CasePanel key={caseId} user={user} id={caseId} draft={perimeterDraft} setDraft={setPerimeterDraft} canDraw={!feed} onWind={setWind} onDraft={onCaseDraft} /> : report ? (reportDetail.initialLoading ? <GovernmentReportDetailSkeleton /> : <>{reportDetail.failed && <div role="alert" className="space-y-3 p-4 text-sm"><p>Report details could not refresh.</p><Button variant="outline" onClick={reportDetail.retry}>Retry</Button></div>}<div aria-busy={reportDetail.refreshing}><ReportReview key={report.id} user={user} report={report} reviewUnavailable={reportDetail.failed || reportDetail.data?.id !== report.id} caseEvidence={reportCase.data?.fieldUpdates ?? []} caseAssignments={reportCase.data?.assignments ?? []} caseVersion={reportCase.data?.version} onDraft={onDraft} perimeterDraft={reportDrawing ? perimeterDraft : null} setPerimeterDraft={setPerimeterDraft} canDraw={!feed && (!perimeterDraft || !!reportDrawing)} /></div></>) : selected ? <ItemDetail item={selected} /> : null;
-  return <IncidentPointContext.Provider value={{ start: setIncidentPick, available: !feed && !associationPick && !reviewDraft.pending && !caseDraft.pending }}><ReportAssociationContext.Provider value={{ activeSourceId: associationPick?.sourceId ?? null, available: !feed && !incidentPick && !perimeterDraft && !reviewDraft.pending && !caseDraft.pending, start: pick => { setListOpen(false); setWorklistOpen(false); setCasesOpen(false); setAssociationPick(pick); }, cancel: () => setAssociationPick(null) }}><main className="relative isolate h-dvh overflow-hidden bg-secondary/40 text-forest">
-    <DraftGuard dashboard dirty={!!perimeterDraft || caseDraft.dirty} pending={!!perimeterDraft?.pending || caseDraft.pending} />
+  return <IncidentPointContext.Provider value={{ start: setIncidentPick, available: !feed && !associationPick && !caseReportPick && !reviewDraft.pending && !caseDraft.pending }}><ReportAssociationContext.Provider value={{ activeSourceId: associationPick?.sourceId ?? null, available: !feed && !incidentPick && !perimeterDraft && !caseReportPick && !reviewDraft.pending && !caseDraft.pending, start: pick => { setListOpen(false); setWorklistOpen(false); setCasesOpen(false); setAssociationPick(pick); }, cancel: () => setAssociationPick(null), caseId: caseReportPick, selectedIds: caseReportIds, selectedReports: (data?.privateReports ?? []).filter(item => caseReportIds.has(item.id)).map(item => ({ id: item.id, number: item.number })), toggleCaseReport: reportId => setCaseReportDraft(current => { if (!caseId) return current; const next = new Set(current?.caseId === caseId ? current.ids : []); if (next.has(reportId)) next.delete(reportId); else next.add(reportId); return { caseId, ids: next }; }), startCase: id => { if (id !== caseId || selectedCase.failed || selectedCase.loading || loaded.failed || incidentPick || perimeterDraft || caseDraft.pending) return; setListOpen(false); setWorklistOpen(false); setCasesOpen(false); setCaseReportPick(id); }, finishCase: () => setCaseReportPick(null), clearCase: () => { setCaseReportPick(null); setCaseReportDraft(null); }, validateCaseSelection: async reportIds => { for (const reportId of reportIds) { const current = await getGovernmentReport(reportId, AbortSignal.timeout(20000)); if (current.case || current.reviewStatus !== "REVIEWED" || current.locationMode !== "INCIDENT_ESTIMATE" || !hasPoint(current)) throw new Error("A selected report changed. Clear it and review the report pins again before saving."); } } }}><main className="relative isolate h-dvh overflow-hidden bg-secondary/40 text-forest">
+    <DraftGuard dashboard dirty={!!perimeterDraft || caseDraft.dirty || caseReportIds.size > 0} pending={!!perimeterDraft?.pending || caseDraft.pending} />
     {feed && newsCaseId && <DraftGuard dirty={newsDraft.dirty} pending={newsDraft.pending} />}
     <h1 className="sr-only">Coordination map</h1>
     <div inert={!!perimeterDraft || (!desktop && detailOpen)}><WorkspaceNav user={user}>{mobileControls}</WorkspaceNav></div>
-    {!feed && <section aria-label="Situation map" className="absolute inset-0">{loaded.initialLoading && !loaded.data ? <MapSkeleton /> : <Suspense fallback={<MapSkeleton />}><SituationMap place={place} focusPoint={focusPoint} items={items} selected={selected} onSelect={select} privateReports={loaded.failed ? [] : mapReports} selectingReport={!!associationPick} selectedReport={report} onSelectReport={selectReport} privateCases={privateCases} selectedCaseId={caseId} onSelectCase={selectCase} draftLocation={incidentPick} onPick={incidentPick ? (latitude, longitude) => setIncidentPick(current => updateIncidentPick(current, latitude, longitude)) : undefined} perimeterDraft={incidentPick ? null : perimeterDraft} onPerimeterDraft={setPerimeterDraft} wind={wind} operationalFeatures={operations ? data?.operationalFeatures ?? [] : []} /></Suspense>}</section>}
+    {!feed && <section aria-label="Situation map" className="absolute inset-0">{loaded.initialLoading && !loaded.data ? <MapSkeleton /> : <Suspense fallback={<MapSkeleton />}><SituationMap place={place} focusPoint={focusPoint} items={caseReportPick ? [] : items} selected={caseReportPick ? null : selected} onSelect={select} privateReports={loaded.failed ? [] : mapReports} selectingReport={!!associationPick || !!caseReportPick} selectedReport={caseReportPick ? null : report} selectedReportIds={caseReportPick ? caseReportIds : undefined} onSelectReport={selectReport} privateCases={caseReportPick ? [] : privateCases} selectedCaseId={caseReportPick ? null : caseId} onSelectCase={caseReportPick ? undefined : selectCase} draftLocation={incidentPick} onPick={incidentPick ? (latitude, longitude) => setIncidentPick(current => updateIncidentPick(current, latitude, longitude)) : undefined} perimeterDraft={incidentPick ? null : perimeterDraft} onPerimeterDraft={setPerimeterDraft} wind={caseReportPick ? null : wind} operationalFeatures={caseReportPick ? [] : operations ? data?.operationalFeatures ?? [] : []} /></Suspense>}</section>}
     {!feed && params.get("publication") && publication.isPending && !publication.item && <PublishedLocationSkeleton />}
     {!feed && params.get("publication") && publication.isError && !publication.item && <div role="alert" className="absolute left-4 top-56 z-20 rounded-sm border bg-white p-4 text-sm sm:top-28">Approved map location unavailable.<Button variant="outline" onClick={() => void publication.refetch()}>Retry</Button></div>}
     {feed && newsCaseId && <section aria-label="Case News editor" className="absolute inset-0 overflow-y-auto bg-white px-4 pb-32 pt-56 sm:px-6 sm:pt-28"><div className="mx-auto max-w-2xl"><Button type="button" variant="ghost" onClick={() => setParams(current => { const next = new URLSearchParams(current); next.delete("news-case"); return next; }, { replace: true })}>Back to Feed</Button>{newsCase.failed && <p role="alert" className="mt-4 text-sm">Case details could not refresh. <Button type="button" variant="outline" onClick={newsCase.retry}>Retry</Button></p>}{newsCase.initialLoading && <p role="status" className="mt-4 text-sm">Loading case…</p>}{newsCase.data && <><h2 className="mt-5 text-xl font-extrabold">{newsCase.data.title}</h2><p className="mt-2 text-sm text-muted-foreground">{newsCase.data.number} · {newsCase.data.verification === "CONFIRMED_FIRE" ? "Confirmed fire" : "Not confirmed"}</p>{newsCase.data.verification === "CONFIRMED_FIRE" && <CompletionNewsEditor key={newsCaseId} user={user} caseId={newsCaseId} onDraft={onNewsDraft} />}</>}</div></section>}
@@ -217,7 +234,8 @@ function Workspace({ user }: { user: DashboardUser }) {
     <MapPanel title="Cases" side="center" desktop={desktop} open={!feed && !perimeterDraft && casesOpen && (desktop || !detailOpen)} keepMounted disabled={!!perimeterDraft} onClose={() => setCasesOpen(false)}>
       <CaseQueue user={user} onSelect={selectCase} />
     </MapPanel>
-    <MapPanel title={caseId ? "Internal case details" : report ? `Review ${report.number}` : selected?.title ?? "Observation details"} count={!report && detailOpen ? "1 selected" : undefined} desktop={desktop} keepMounted open={!feed && detailOpen && !incidentPick && !associationPick} drawing={!!perimeterDraft} disabled={reviewDraft.pending || caseDraft.pending || !!perimeterDraft} onClose={closeDetail}><fieldset disabled={!!incidentPick}>{detail}</fieldset></MapPanel>
+    <MapPanel title={caseId ? "Internal case details" : report ? `Review ${report.number}` : selected?.title ?? "Observation details"} count={!report && detailOpen ? "1 selected" : undefined} desktop={desktop} keepMounted open={!feed && detailOpen && !incidentPick && !associationPick && !caseReportPick} drawing={!!perimeterDraft} disabled={reviewDraft.pending || caseDraft.pending || !!perimeterDraft} onClose={closeDetail}><fieldset disabled={!!incidentPick}>{detail}</fieldset></MapPanel>
+    {caseReportPick && <section aria-labelledby="case-report-pick-title" className="absolute left-1/2 top-28 z-50 w-[min(32rem,calc(100%-2rem))] -translate-x-1/2 rounded-xl border border-primary/15 bg-white p-4 shadow-xl"><h2 id="case-report-pick-title" className="font-extrabold">Select related reports</h2>{loaded.failed && <div role="alert" className="mt-3 text-sm">Report pins could not refresh. Your selections are unchanged.<Button type="button" variant="outline" className="mt-2" onClick={loaded.retry}>Retry map data</Button></div>}<p className="mt-1 text-sm text-muted-foreground">Only unlinked, reviewed report pins are shown. Select more than one if they describe this case. Nothing is linked until you save {selectedCase.data?.verification === "CONFIRMED_FIRE" ? "a boundary revision" : "the fire confirmation and boundary"}.</p><p role="status" className="mt-2 text-sm font-bold">{caseReportIds.size} selected</p><div className="mt-3 flex flex-wrap gap-2"><Button type="button" onClick={() => setCaseReportPick(null)}>Done selecting</Button><Button type="button" variant="outline" onClick={() => { setCaseReportPick(null); setCaseReportDraft(null); }}>Clear selection</Button></div></section>}
     {associationPick && <section aria-labelledby="association-pick-title" className="absolute left-1/2 top-28 z-50 w-[min(32rem,calc(100%-2rem))] -translate-x-1/2 rounded-xl border border-primary/15 bg-white p-4 shadow-xl"><h2 id="association-pick-title" className="font-extrabold">Select a related report</h2><p className="mt-1 text-sm text-muted-foreground">Click a private report document pin. Hotspots, published information, cases, access points, and water sources are not selectable.</p><Button type="button" variant="outline" className="mt-3" onClick={() => setAssociationPick(null)}>Cancel selection</Button></section>}
     {incidentPick && <section aria-label="Choose fire location" className="absolute left-1/2 top-24 z-50 w-[min(24rem,calc(100%-2rem))] -translate-x-1/2 space-y-3 rounded-xl border border-primary/15 bg-white p-4 shadow-xl"><h2 className="font-extrabold">Choose the observed fire location</h2><p className="text-sm text-muted-foreground">Click the map to place the pin where the team saw fire, then confirm it here. This is a point, not the fire boundary.</p><p role="status" className="text-xs font-bold">{incidentPick.latitude && incidentPick.longitude ? `Selected: ${incidentPick.latitude}, ${incidentPick.longitude}` : "No point selected yet"}</p><div className="flex flex-wrap gap-2"><Button type="button" disabled={!incidentPick.latitude || !incidentPick.longitude} onClick={() => { incidentPick.apply(incidentPick); setIncidentPick(null); }}>Use this location</Button><Button type="button" variant="outline" onClick={() => setIncidentPick(null)}>Cancel</Button></div></section>}
     <div inert={!!perimeterDraft || (!desktop && detailOpen)} className="absolute bottom-6 left-1/2 z-30 hidden w-[calc(100%-160px)] max-w-3xl -translate-x-1/2 items-center gap-1 rounded-full border bg-white p-2 shadow-xl sm:flex">{searchControl("observation-search", "top")}{actions}</div>

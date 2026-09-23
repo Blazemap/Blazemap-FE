@@ -18,15 +18,22 @@ import WindMap from "./WindMap";
 import type { GovernmentReport } from "@/types/government";
 import { mapPanelPadding } from "@/lib/dashboard";
 
-export default function SituationMap({ place = null, focusPoint = null, items, selected, draftLocation, onSelect, onPick, selectingReport = false, perimeterDraft = null, onPerimeterDraft, wind = null, privateReports = [], selectedReport = null, onSelectReport, privateCases = [], selectedCaseId = null, onSelectCase, ownReports = [], selectedOwnReport = null, onSelectOwnReport, operationalFeatures = [] }: { operationalFeatures?: OperationalMapFeature[]; place?: import("@/lib/places").Place | null; focusPoint?: { latitude: number; longitude: number } | null; privateReports?: GovernmentReport[]; selectingReport?: boolean; selectedReport?: GovernmentReport | null; onSelectReport?: (report: GovernmentReport) => void; privateCases?: CaseItem[]; selectedCaseId?: string | null; onSelectCase?: (id: string) => void; ownReports?: OwnReport[]; selectedOwnReport?: OwnReport | null; onSelectOwnReport?: (id: string) => void; wind?: WindArrow | null; perimeterDraft?: PerimeterEditorProps["draft"]; onPerimeterDraft?: PerimeterEditorProps["setDraft"]; items: MapItem[]; selected: MapItem | null; draftLocation?: { latitude: string; longitude: string } | null; onSelect: (id: string) => void; onPick?: (latitude: string, longitude: string) => void }) {
+export default function SituationMap({ place = null, focusPoint = null, items, selected, draftLocation, onSelect, onPick, selectingReport = false, selectedReportIds, perimeterDraft = null, onPerimeterDraft, wind = null, privateReports = [], selectedReport = null, onSelectReport, privateCases = [], selectedCaseId = null, onSelectCase, ownReports = [], selectedOwnReport = null, onSelectOwnReport, operationalFeatures = [] }: { operationalFeatures?: OperationalMapFeature[]; place?: import("@/lib/places").Place | null; focusPoint?: { latitude: number; longitude: number } | null; privateReports?: GovernmentReport[]; selectingReport?: boolean; selectedReportIds?: ReadonlySet<string>; selectedReport?: GovernmentReport | null; onSelectReport?: (report: GovernmentReport) => void; privateCases?: CaseItem[]; selectedCaseId?: string | null; onSelectCase?: (id: string) => void; ownReports?: OwnReport[]; selectedOwnReport?: OwnReport | null; onSelectOwnReport?: (id: string) => void; wind?: WindArrow | null; perimeterDraft?: PerimeterEditorProps["draft"]; onPerimeterDraft?: PerimeterEditorProps["setDraft"]; items: MapItem[]; selected: MapItem | null; draftLocation?: { latitude: string; longitude: string } | null; onSelect: (id: string) => void; onPick?: (latitude: string, longitude: string) => void }) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map | null>(null);
   const latest = useRef({ items, onSelect, selected, onPick, draftLocation, perimeterDraft, selectingReport });
   const pickMarker = useRef<Marker | null>(null);
+  const selectionMode = useRef(false);
   const [attempt, setAttempt] = useState(0);
   const [readyMap, setReadyMap] = useState<Map | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   useEffect(() => { latest.current = { items, onSelect, selected, onPick, draftLocation, perimeterDraft, selectingReport }; });
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || state !== "ready" || selectionMode.current === selectingReport) return;
+    selectionMode.current = selectingReport;
+    for (const layer of ["clusters", "counts", "points", "hotspot-clusters", "hotspots", "selected-point"]) if (map.getLayer(layer)) map.setLayoutProperty(layer, "visibility", selectingReport ? "none" : "visible");
+  }, [selectingReport, readyMap, state]);
   useEffect(() => {
     if (!container.current) return;
     let map: Map;
@@ -73,6 +80,7 @@ export default function SituationMap({ place = null, focusPoint = null, items, s
           map.on("mouseleave", layer, () => { map.getCanvas().style.cursor = ""; });
         }
         hasLoaded = true;
+        selectionMode.current = false;
         setReadyMap(map);
         setState("ready");
       });
@@ -162,24 +170,25 @@ export default function SituationMap({ place = null, focusPoint = null, items, s
     const casesWithPerimeters = new Set(privateCases.filter(item => item.perimeter).map(item => item.id));
     const markers = privateReports.filter(hasPoint).filter(report => {
       const selectedMarker = selectedReport?.id === report.id;
-      return selectingReport || (selectedMarker && !!perimeterDraft) || !report.case?.id || !casesWithPerimeters.has(report.case.id);
+      return selectingReport || selectedMarker || !report.case?.id || !casesWithPerimeters.has(report.case.id);
     }).map(report => {
       const button = document.createElement("button");
       button.type = "button";
       const appearance = triageAppearance[effectiveReportPriority(report)];
-      const selectedMarker = selectedReport?.id === report.id;
+      const selectedMarker = selectedReportIds?.has(report.id) || selectedReport?.id === report.id;
       button.className = `grid size-11 place-items-center rounded-full border-2 text-lg font-extrabold text-white shadow-lg ${selectedMarker ? "border-forest ring-4 ring-white/90" : "border-white"}`;
+      if (selectedReportIds) button.setAttribute("aria-pressed", String(selectedReportIds.has(report.id)));
       button.style.backgroundColor = appearance.color;
       button.disabled = !!perimeterDraft;
       const meaning = report.locationMode === "OBSERVER_POSITION" ? "Observer position, not incident location" : "Estimated incident location";
-      button.setAttribute("aria-label", `${report.number}. Review priority: ${appearance.label}. ${meaning}. ${perimeterDraft ? "Selected report location under boundary editor" : selectingReport ? "Select this report as related" : "Open private report review"}`);
+      button.setAttribute("aria-label", `${report.number}. Review priority: ${appearance.label}. ${meaning}. ${perimeterDraft ? "Selected report location under boundary editor" : selectedReportIds ? selectedReportIds.has(report.id) ? "Remove from related report selection" : "Add to related report selection" : selectingReport ? "Select this report as related" : "Open private report review"}`);
       button.title = `${report.number}: ${appearance.label} priority. ${meaning}`;
       button.innerHTML = '<img src="/icons8-document.png" width="28" height="28" alt="" aria-hidden="true" />';
       button.addEventListener("click", event => { event.stopPropagation(); if (!perimeterDraft) onSelectReport?.(report); });
       return new Marker({ element: button }).setLngLat([report.longitude, report.latitude]).addTo(readyMap);
     });
     return () => markers.forEach(marker => marker.remove());
-  }, [readyMap, state, privateReports, selectedReport, privateCases, onSelectReport, perimeterDraft, onPick, selectingReport]);
+  }, [readyMap, state, privateReports, selectedReport, selectedReportIds, privateCases, onSelectReport, perimeterDraft, onPick, selectingReport]);
   useEffect(() => {
     if (!readyMap || state !== "ready" || perimeterDraft || onPick) return;
     const publishedCaseNumbers = new Set(items.flatMap(item => item.publicPerimeter && item.caseNumber ? [item.caseNumber] : []));
