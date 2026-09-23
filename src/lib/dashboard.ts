@@ -25,8 +25,8 @@ export function safeWorkspaceDestination(next: string, role: DashboardUser["role
   if (path === "/report") return reportDestination(search).replace("/dashboard", home);
   return next;
 }
-export function boundPanel(box: { x: number; y: number; width: number; height: number }, viewport: { width: number; height: number }) {
-  const maxWidth = Math.max(1, Math.min(600, viewport.width - 48));
+export function boundPanel(box: { x: number; y: number; width: number; height: number }, viewport: { width: number; height: number }, maxPanelWidth = 600) {
+  const maxWidth = Math.max(1, Math.min(maxPanelWidth, viewport.width - 48));
   const maxHeight = Math.max(1, viewport.height - 120);
   const width = Math.min(maxWidth, Math.max(Math.min(320, maxWidth), box.width));
   const height = Math.min(maxHeight, Math.max(Math.min(400, maxHeight), box.height));

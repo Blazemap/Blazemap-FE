@@ -6,10 +6,15 @@ export default function MapPanel({ title, count, open, desktop, side = "right", 
   const panel = useRef<HTMLElement>(null);
   const handle = useRef<HTMLButtonElement>(null);
   const opener = useRef<HTMLElement | null>(null);
-  const [box, setBox] = useState(() => boundPanel({ x: side === "left" ? 24 : side === "center" ? Math.max(48, (window.innerWidth - 420) / 2) : window.innerWidth - 444, y: 96, width: side === "left" ? 380 : 420, height: window.innerHeight - 120 }, { width: window.innerWidth, height: window.innerHeight }));
+  const panelWidth = (viewportWidth: number) => Math.max(320, Math.round(viewportWidth * 0.35));
+  const maxPanelWidth = Math.max(600, Math.round(window.innerWidth * 0.45));
+  const [box, setBox] = useState(() => {
+    const width = panelWidth(window.innerWidth);
+    return boundPanel({ x: side === "left" ? 24 : side === "center" ? Math.max(48, (window.innerWidth - width) / 2) : window.innerWidth - width - 24, y: 96, width, height: window.innerHeight - 120 }, { width: window.innerWidth, height: window.innerHeight }, maxPanelWidth);
+  });
   const [height, setHeight] = useState(side === "center" ? 52 : 68);
   const gesture = useRef<{ x: number; y: number; box: typeof box; height: number; resize: boolean } | null>(null);
-  function adjust(next: typeof box) { setBox(boundPanel(next, { width: window.innerWidth, height: window.innerHeight })); }
+  function adjust(next: typeof box) { setBox(boundPanel(next, { width: window.innerWidth, height: window.innerHeight }, Math.max(600, Math.round(window.innerWidth * 0.45)))); }
   useEffect(() => {
     if (!open) return;
     opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -19,7 +24,7 @@ export default function MapPanel({ title, count, open, desktop, side = "right", 
   useEffect(() => {
     const element = panel.current;
     if (!element || !open || !desktop) return;
-    const constrain = () => setBox(current => boundPanel({ ...current, width: element.offsetWidth || current.width, height: element.offsetHeight || current.height }, { width: window.innerWidth, height: window.innerHeight }));
+    const constrain = () => setBox(current => boundPanel({ ...current, width: element.offsetWidth || current.width, height: element.offsetHeight || current.height }, { width: window.innerWidth, height: window.innerHeight }, Math.max(600, Math.round(window.innerWidth * 0.45))));
     const observer = new ResizeObserver(constrain);
     observer.observe(element);
     window.addEventListener("resize", constrain);
