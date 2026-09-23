@@ -27,7 +27,7 @@ export default function OperationsTeamsPage() {
       {!data.teams.length ? <EmptyPanel>No production teams are recorded.</EmptyPanel> : <ul className="divide-y divide-primary/10">{data.teams.map(item => <li key={item.id} className="grid gap-5 p-5 lg:grid-cols-[1fr_1fr_auto]">
         <div><div className="flex flex-wrap items-center gap-2"><h3 className="font-extrabold">{item.name}</h3><StatusPill tone={item.active ? "success" : "neutral"}>{item.active ? "Active" : "Inactive"}</StatusPill></div><p className="mt-1 text-sm text-muted-foreground">{item.organization || "No organization"}</p><div className="mt-3"><Condition condition={item.latestCondition} /></div><Freshness observedAt={item.latestObservedAt} updatedAt={item.updatedAt} /></div>
         <TeamPerformance item={item} />
-        <div><Button asChild variant="outline"><Link to={encodeURIComponent(item.id)}>View details</Link></Button></div>
+        <div className="flex flex-wrap content-start items-start gap-2 self-start lg:justify-end"><Button asChild variant="outline"><Link to={encodeURIComponent(item.id)}>View details</Link></Button>{item.active && item.activeAssignmentCount === 0 && <Button asChild variant="outline"><Link to={encodeURIComponent(item.id)} state={{ availability: true }}>Record availability</Link></Button>}</div>
       </li>)}</ul>}
     </section>
     <OperationsSnapshot data={data} />
@@ -37,6 +37,7 @@ export default function OperationsTeamsPage() {
 function TeamDetailContent({ item, updates, refresh }: { item: MonitoringOperations["teams"][number]; updates: MonitoringOperations["updates"]; refresh: () => Promise<void> }) {
   const { state } = useLocation();
   const [editing, setEditing] = useState(state?.edit === true);
+  const [availabilityOpen, setAvailabilityOpen] = useState(state?.availability === true);
   const [conditionDraft, setConditionDraft] = useState({ dirty: false, pending: false });
   const [name, setName] = useState(item.name);
   const [organization, setOrganization] = useState(item.organization ?? "");
@@ -58,10 +59,11 @@ function TeamDetailContent({ item, updates, refresh }: { item: MonitoringOperati
   return <div className="mt-7 space-y-5"><DraftGuard dirty={dirty || conditionDraft.dirty} pending={mutation.isPending || conditionDraft.pending} dashboard />
     {!editing ? <>
       <section className={`${panelClass} p-5 sm:p-6`}>
-        <header className="flex flex-col justify-between gap-5 sm:flex-row sm:items-start"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="text-xl font-extrabold">{item.name}</h2><StatusPill tone={item.active ? "success" : "danger"}>{item.active ? "Active" : "Inactive"}</StatusPill></div><p className="mt-2 text-sm text-muted-foreground">{item.organization || "No organization recorded"}</p></div><Button type="button" onClick={() => { reset(); setEditing(true); }}><Pencil size={16} aria-hidden="true" />Edit team</Button></header>
+        <header className="flex flex-col justify-between gap-5 sm:flex-row sm:items-start"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="text-xl font-extrabold">{item.name}</h2><StatusPill tone={item.active ? "success" : "danger"}>{item.active ? "Active" : "Inactive"}</StatusPill></div><p className="mt-2 text-sm text-muted-foreground">{item.organization || "No organization recorded"}</p></div><div className="flex flex-wrap gap-2">{item.active && item.activeAssignmentCount === 0 && <Button type="button" onClick={() => setAvailabilityOpen(true)}>Record availability</Button>}<Button type="button" variant="outline" onClick={() => { reset(); setEditing(true); }}><Pencil size={16} aria-hidden="true" />Edit team</Button></div></header>
         <div className="mt-6 border-t border-primary/10 pt-6"><Condition condition={item.latestCondition} /><Freshness observedAt={item.latestObservedAt} updatedAt={item.updatedAt} /></div>
         <dl className="mt-6 grid gap-5 border-t border-primary/10 pt-6 text-sm sm:grid-cols-2"><div><dt className="text-xs font-bold text-muted-foreground">Created</dt><dd className="mt-1">{formatTime(item.createdAt)}</dd></div><div><dt className="text-xs font-bold text-muted-foreground">Last updated</dt><dd className="mt-1">{formatTime(item.updatedAt)}</dd></div><div><dt className="text-xs font-bold text-muted-foreground">Active assignments</dt><dd className="mt-1 font-extrabold">{item.activeAssignmentCount}</dd></div><div><dt className="text-xs font-bold text-muted-foreground">Record version</dt><dd className="mt-1 font-extrabold">{item.version}</dd></div></dl>
       </section>
+      {availabilityOpen && <section className={`${panelClass} p-5 sm:p-6`}><div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-lg font-extrabold">Record availability</h2><Button type="button" variant="outline" disabled={conditionDraft.pending} onClick={() => { if (!conditionDraft.dirty || window.confirm("Discard unsaved availability update?")) setAvailabilityOpen(false); }}>Cancel</Button></div><ConditionCreate subjectType="TEAM" initialSubjectId={item.id} initialSubject={item} refresh={refresh} onDraft={setConditionDraft} onSaved={() => setAvailabilityOpen(false)} /></section>}
       <section className={`${panelClass} p-5 sm:p-6`}><header className="flex flex-wrap items-center justify-between gap-4"><div><h2 className="text-lg font-extrabold">Assignment performance</h2><p className="mt-1 text-xs text-muted-foreground">Recorded outcomes for this response team.</p></div></header><div className="mt-5"><TeamPerformance item={item} /></div></section>
              <ConditionHistory updates={updates} />
     </> : <div className="space-y-5"><section className={`${panelClass} p-5 sm:p-6`}>
@@ -75,7 +77,7 @@ function TeamDetailContent({ item, updates, refresh }: { item: MonitoringOperati
         {mutation.error && <p role="alert" className="text-sm text-red-800">{mutation.error.message}</p>}
         <div className="flex flex-wrap justify-end gap-3 border-t border-primary/10 pt-5"><Button type="button" variant="outline" disabled={mutation.isPending} onClick={() => { reset(); setEditing(false); }}>Cancel</Button><Button type="submit" disabled={mutation.isPending || conditionDraft.dirty || !changed || name.trim().length < 2 || reason.trim().length < 5}><Save size={16} aria-hidden="true" />{mutation.isPending ? "Saving…" : "Save team"}</Button></div>
        </form>
-    </section><section className={`${panelClass} p-5 sm:p-6`}><ConditionCreate subjectType="TEAM" initialSubjectId={item.id} initialSubject={item} refresh={refresh} onDraft={setConditionDraft} /></section></div>}
+    </section></div>}
   </div>;
 }
 

@@ -1,4 +1,4 @@
-import axios, { isAxiosError } from "axios";
+import { isAxiosError } from "axios";
 import { apiClient } from "@/config/api-client";
 import { apiEndpoints, dashboardRefreshMs } from "@/constants";
 import { getSharedAccount } from "@/api/dashboard";
@@ -55,12 +55,14 @@ export async function uploadPhoto(user: DashboardUser, photo: ReportPhoto, updat
   await requireReportAccount(user);
   let id = photo.intentId;
   if (!photo.uploaded) {
-    const { data: intent } = await request<{ data: { id: string; uploadUrl: string; method: string; headers: Record<string, string> } }>(`${apiEndpoints.uploads}/intents`, undefined, { filename: photo.file.name, size: photo.file.size, contentType: photo.file.type });
-    const url = new URL(intent.uploadUrl);
-    if (url.protocol !== "https:" || url.username || url.password || intent.method !== "PUT" || !intent.id) throw new ReportError(502);
-    id = intent.id;
-    update({ intentId: id, progress: 0 });
-    await axios.put(url.href, photo.file, { adapter: "xhr", withCredentials: false, timeout: 120000, headers: intent.headers, onUploadProgress: ({ loaded, total }) => update({ progress: Math.min(99, Math.round(loaded / (total || photo.file.size) * 100)) }) });
+    if (!id) {
+      const { data: intent } = await request<{ data: { id: string } }>(`${apiEndpoints.uploads}/intents`, undefined, { filename: photo.file.name, size: photo.file.size, contentType: photo.file.type });
+      if (!intent.id) throw new ReportError(502);
+      id = intent.id;
+      update({ intentId: id, progress: 0 });
+    }
+    const response = await apiClient.put<{ data: { id: string } }>(`${apiEndpoints.uploads}/${encodeURIComponent(id)}/content`, photo.file, { timeout: 120000, headers: { "Content-Type": photo.file.type }, onUploadProgress: ({ loaded, total }) => update({ progress: Math.min(99, Math.round(loaded / (total || photo.file.size) * 100)) }) });
+    if (response.data.data?.id !== id) throw new ReportError(502);
     update({ uploaded: true });
   }
   if (!id) throw new ReportError(502);
