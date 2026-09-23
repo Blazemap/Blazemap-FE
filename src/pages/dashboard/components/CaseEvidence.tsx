@@ -3,16 +3,34 @@ import { useEffect, useState } from "react";
 import { Button, FieldHelp, FieldLength, FieldSelect } from "@/components/ui";
 import type { DashboardUser } from "@/types";
 import type { CaseDetail } from "@/types/government";
-import { reviewGovernmentReport } from "@/api/dashboard/government";
+import { recordField, reviewGovernmentReport } from "@/api/dashboard/government";
+import { Link } from "react-router-dom";
+import IncidentPointInput from "./IncidentPointInput";
 import { useGovernmentMutation } from "@/hooks/dashboard/useGovernment";
 import { drawingFrom } from "@/lib/perimeter";
 import type { PerimeterEditorProps } from "./CasePerimeter";
 
 const control = "mt-1 min-h-11 w-full rounded-lg border border-input bg-white px-3 text-sm";
+function fieldObservationTime(value: string) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime()) || date.getTime() > Date.now()) throw new Error("Enter the actual field observation time.");
+  return date.toISOString();
+}
 export default function CaseEvidence({ user, detail, refresh, onDraft, draft, setDraft, canDraw, reportId, reportReviewStatus }: PerimeterEditorProps & { user: DashboardUser; detail: CaseDetail; refresh: () => void; canDraw: boolean; reportId?: string; reportReviewStatus?: string; onDraft: (state: { dirty: boolean; pending: boolean }) => void }) {
   const [status, setStatus] = useState<string>(reportReviewStatus === "DECLINED" ? "DECLINED" : detail.verification === "CONFIRMED_FIRE" ? "CONFIRMED_FIRE" : reportReviewStatus === "UNDER_REVIEW" || reportReviewStatus === "NEEDS_DETAILS" ? "IN_PROGRESS" : "REVIEWED");
   const [description, setDescription] = useState("");
   const [confirmationEvidence, setConfirmationEvidence] = useState(emptyConfirmationEvidence);
+  const [recording, setRecording] = useState(false);
+  const [recordedFieldId, setRecordedFieldId] = useState("");
+  const [assignmentId, setAssignmentId] = useState("");
+  const [source, setSource] = useState("");
+  const [observedAt, setObservedAt] = useState("");
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
+  const [observation, setObservation] = useState("");
+  const eligibleAssignments = detail.assignments.filter(item => ["ACCEPTED", "IN_PROGRESS", "COMPLETED"].includes(item.status));
+  const evidenceReady = detail.fieldUpdates.some(item => item.id === confirmationEvidence.fieldUpdateId && item.assignmentId && item.teamId && item.findings === "VISIBLE_FIRE") || !!recordedFieldId && recordedFieldId === confirmationEvidence.fieldUpdateId;
+  const selectedAssignment = eligibleAssignments.find(item => item.id === assignmentId);
   const confirmation = draft?.caseId === detail.id && !!draft.confirmation;
   const selectedStatus = confirmation ? "CONFIRMED_FIRE" : status;
   const confirming = selectedStatus === "CONFIRMED_FIRE" && (detail.verification !== "CONFIRMED_FIRE" || confirmation);
@@ -27,21 +45,33 @@ export default function CaseEvidence({ user, detail, refresh, onDraft, draft, se
     else throw new Error("Open a report to change its review status.");
     setDescription("");
   }, undefined, "Review update saved");
-  const pending = mutation.isPending || !!draft?.pending;
+  const evidence = useGovernmentMutation(user, async () => {
+    if (!selectedAssignment) throw new Error("Select an accepted or in-progress assignment.");
+    const timestamp = fieldObservationTime(observedAt);
+    const lat = Number(latitude), lng = Number(longitude);
+    if (!latitude.trim() || !longitude.trim() || !Number.isFinite(lat) || Math.abs(lat) > 90 || !Number.isFinite(lng) || Math.abs(lng) > 180) throw new Error("Select the actual field observation point.");
+    const fieldUpdateId = await recordField(detail.id, { findings: "VISIBLE_FIRE", description: observation.trim(), source: source.trim(), teamId: selectedAssignment.teamId, assignmentId: selectedAssignment.id, observedAt: timestamp, latitude: lat, longitude: lng });
+    setRecordedFieldId(fieldUpdateId);
+    refresh();
+    setConfirmationEvidence(value => ({ ...value, fieldUpdateId }));
+    setRecording(false);
+    setAssignmentId(""); setSource(""); setObservedAt(""); setLatitude(""); setLongitude(""); setObservation("");
+  }, undefined, "Field observation recorded");
+  const pending = mutation.isPending || evidence.isPending || !!draft?.pending;
   const confirmationEvidenceDirty = !!(confirmationEvidence.fieldUpdateId || confirmationEvidence.source || confirmationEvidence.observedAt || confirmationEvidence.latitude || confirmationEvidence.longitude);
-  const dirty = !!(description || confirmation || (confirming && confirmationEvidenceDirty));
+  const dirty = !!(description || confirmation || recording && (assignmentId || source || observedAt || latitude || longitude || observation) || (confirming && confirmationEvidenceDirty));
   useEffect(() => { onDraft({ dirty, pending }); }, [dirty, pending, onDraft]);
   useEffect(() => () => onDraft({ dirty: false, pending: false }), [onDraft]);
   function selectStatus(value: string) {
     mutation.reset();
     if (value !== "CONFIRMED_FIRE" && (confirmation || confirmationEvidenceDirty) && !window.confirm("Discard the unsaved confirmation evidence and boundary?")) return;
     if (confirmation) setDraft(null);
-    if (value !== "CONFIRMED_FIRE") setConfirmationEvidence(emptyConfirmationEvidence());
+    if (value !== "CONFIRMED_FIRE") { setConfirmationEvidence(emptyConfirmationEvidence()); setRecordedFieldId(""); }
     setStatus(value);
   }
   function startDrawing() {
     const evidenceId = confirmationEvidence.fieldUpdateId;
-    if (!authorized || !canDraw || pending || draft || reportReviewStatus === "DECLINED" || !evidenceId || !detail.fieldUpdates.some(item => item.id === evidenceId && item.assignmentId && item.teamId && item.findings === "VISIBLE_FIRE")) return;
+    if (!authorized || !canDraw || pending || draft || reportReviewStatus === "DECLINED" || !evidenceId || !evidenceReady) return;
     setDraft({ caseId: detail.id, version: detail.version, drawing: drawingFrom(null), history: [], observedAt: "", source: "", reason: description, authority: "", pending: false, fit: 1, confirmation: { fieldUpdateId: evidenceId, reuseFieldObservation: true } });
     setDescription("");
   }
@@ -54,9 +84,12 @@ export default function CaseEvidence({ user, detail, refresh, onDraft, draft, se
       {!authorized && <p role="status" className="text-xs">Confirmation requires an active, email-verified ADMIN account.</p>}
       {reportReviewStatus === "DECLINED" && <p className="text-xs">Reopen report review before confirming its linked case. Decline and case verification are independent.</p>}
       {!canDraw && <p className="text-xs">Open this case on the map to select confirmed fire.</p>}
-      {confirming && <ConfirmationEvidenceStep id="case-confirmation" evidence={detail.fieldUpdates} value={confirmationEvidence} onChange={setConfirmationEvidence} disabled={pending || !!confirmation} />}
+       {confirming && <ConfirmationEvidenceStep id="case-confirmation" evidence={detail.fieldUpdates} value={confirmationEvidence} onChange={setConfirmationEvidence} disabled={pending || !!confirmation} />}
+       {confirming && !confirmation && !recording && <Button type="button" variant="outline" disabled={pending || !eligibleAssignments.length} onClick={() => setRecording(true)}>Record visible-fire result</Button>}
+       {confirming && !confirmation && !eligibleAssignments.length && <p className="text-xs">An assigned team must accept or start field work first. <Link className="font-bold text-primary underline" to="/monitoring/operations/assignments">Open assignments</Link>.</p>}
       {confirmation && <p role="status" className="text-xs">Draw the required boundary. Confirmation remains unsaved until the closed polygon succeeds.</p>}
-      {detail.verification === "CONFIRMED_FIRE" && !confirmation ? <p role="status" className="text-xs">This case is already confirmed. Use the separate boundary revision flow for audited changes.</p> : !confirmation && (confirming ? <><p className="text-xs">Select an existing visible-fire result, then draw the required closed boundary.</p><Button type="button" disabled={!authorized || !canDraw || pending || !!draft || !detail.fieldUpdates.some(item => item.id === confirmationEvidence.fieldUpdateId && item.assignmentId && item.teamId && item.findings === "VISIBLE_FIRE") || reportReviewStatus === "DECLINED"} onClick={startDrawing}>Draw fire boundary</Button></> : <Button disabled={!reportId}>{pending ? "Saving…" : "Save"}</Button>)}
-    </fieldset>{mutation.error && <div role="alert"><p>{mutation.error.message}</p><Button type="button" variant="outline" onClick={refresh}>Refresh case</Button></div>}</form>}
-  </section>;
+      {detail.verification === "CONFIRMED_FIRE" && !confirmation ? <p role="status" className="text-xs">This case is already confirmed. Use the separate boundary revision flow for audited changes.</p> : !confirmation && (confirming ? <><p className="text-xs">Select an existing visible-fire result, then draw the required closed boundary.</p><Button type="button" disabled={!authorized || !canDraw || pending || !!draft || !evidenceReady || reportReviewStatus === "DECLINED"} onClick={startDrawing}>Draw fire boundary</Button></> : <Button disabled={!reportId}>{pending ? "Saving…" : "Save"}</Button>)}
+     </fieldset>{mutation.error && <div role="alert"><p>{mutation.error.message}</p><Button type="button" variant="outline" onClick={refresh}>Refresh case</Button></div>}</form>}
+     {recording && confirming && !confirmation && <form className="space-y-3 rounded-lg border border-primary/15 bg-white p-4" onSubmit={event => { event.preventDefault(); evidence.mutate(); }}><h4 className="font-bold">Record visible-fire result</h4><p className="text-xs text-muted-foreground">Record only an actual observation from an assigned field team, not a report estimate.</p><fieldset disabled={pending} className="space-y-3"><label htmlFor="visible-fire-assignment" className="block text-sm font-bold">Assigned team <span aria-hidden="true">*</span><FieldSelect id="visible-fire-assignment" required value={assignmentId} onValueChange={setAssignmentId} placeholder="Select accepted field assignment" options={eligibleAssignments.map(item => ({ value: item.id, label: item.team.name }))} /></label><label htmlFor="visible-fire-observed" className="block text-sm font-bold">Observed (local time) <span aria-hidden="true">*</span><input id="visible-fire-observed" type="datetime-local" required value={observedAt} onChange={event => setObservedAt(event.target.value)} className={control} /></label><label htmlFor="visible-fire-source" className="block text-sm font-bold">Observation source <span aria-hidden="true">*</span><input id="visible-fire-source" required minLength={3} maxLength={300} value={source} onChange={event => setSource(event.target.value)} className={control} /></label><label htmlFor="visible-fire-description" className="block text-sm font-bold">Observed findings <span aria-hidden="true">*</span><textarea id="visible-fire-description" required minLength={5} maxLength={2000} value={observation} onChange={event => setObservation(event.target.value)} className={`${control} py-2`} /></label><IncidentPointInput latitude={latitude} longitude={longitude} disabled={pending} onChange={(lat, lng) => { setLatitude(lat); setLongitude(lng); }} /><div className="flex flex-wrap gap-2"><Button type="submit" disabled={!selectedAssignment || !source.trim() || !observedAt || !observation.trim() || !latitude.trim() || !longitude.trim() || pending}>{evidence.isPending ? "Recording…" : "Record result"}</Button><Button type="button" variant="outline" onClick={() => { setRecording(false); setAssignmentId(""); setSource(""); setObservedAt(""); setLatitude(""); setLongitude(""); setObservation(""); evidence.reset(); }}>Cancel</Button></div></fieldset>{evidence.error && <p role="alert" className="text-sm">{evidence.error.message}</p>}</form>}
+   </section>;
 }
