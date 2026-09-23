@@ -70,6 +70,7 @@ type ReviewProps = {
   caseEvidence?: (FieldInput & { id: string })[];
   caseAssignments?: import("@/types/government").CaseDetail["assignments"];
   caseVersion?: number;
+  reviewUnavailable?: boolean;
   canDraw: boolean;
   onDraft: (dirty: boolean, pending: boolean) => void;
   perimeterDraft: PerimeterDraft | null;
@@ -94,7 +95,7 @@ function ConfirmationReadiness({ user, report, evidence, assignments, pending, o
   </section>;
 }
 
-export function ReportReview({ user, report, caseEvidence = [], caseAssignments = [], onDraft }: ReviewProps) {
+export function ReportReview({ user, report, caseEvidence = [], caseAssignments = [], reviewUnavailable = false, onDraft }: ReviewProps) {
   const reducedMotion = useReducedMotion();
   const initialStatus = initialActionStatus(report);
   const [description, setDescription] = useState("");
@@ -111,6 +112,7 @@ export function ReportReview({ user, report, caseEvidence = [], caseAssignments 
   useEffect(() => { photoRef.current = photos; }, [photos]);
   useEffect(() => () => photoRef.current.forEach(photo => URL.revokeObjectURL(photo.preview)), []);
   const save = useGovernmentMutation(user, async () => {
+    if (reviewUnavailable) throw new Error("Refresh the report details before saving this review.");
     if (!submitted.current && description.trim().length < 5) throw new Error("Enter a description of at least five characters.");
     const ids: string[] = [];
     for (let index = 0; !submitted.current && index < photos.length; index++) {
@@ -151,7 +153,7 @@ export function ReportReview({ user, report, caseEvidence = [], caseAssignments 
         <div className="flex items-center justify-between gap-2"><h4 className="text-sm font-bold">Review update</h4><FieldHelp title="Review status">Review status does not confirm a fire. Confirmation is available only in a linked case after an assigned team records a visible-fire field result.</FieldHelp></div>
         <label htmlFor="report-review-status" className="block text-sm font-bold">Status <span aria-hidden="true">*</span><FieldSelect id="report-review-status" required value={confirmationIntent ? "CONFIRM_FIRE" : reviewStatus} disabled={attempted || pending} onValueChange={value => { if (value === "CONFIRM_FIRE") setConfirmationIntent(true); else { setConfirmationIntent(false); setReviewStatus(value as ReportActionStatus); } }} options={[{ value: "IN_PROGRESS", label: "In progress" }, { value: "REVIEWED", label: "Reviewed" }, { value: "CONFIRM_FIRE", label: "Confirm fire" }, { value: "DECLINED", label: "Declined" }]} /></label>
         {!confirmationIntent && <><label htmlFor="report-owner-update" className="block text-sm font-bold">Update for the report owner <span aria-hidden="true">*</span><textarea id="report-owner-update" required aria-required="true" minLength={5} maxLength={2000} value={description} onChange={event => setDescription(event.target.value)} className={`${control} min-h-24 py-3`} /><FieldLength value={description} min={5} max={2000} /></label><EvidenceUpload count={photos.length} disabled={attempted || pending} error={photoError} onError={setPhotoError} onFiles={files => setPhotos(current => [...current, ...files.map(file => ({ file, preview: URL.createObjectURL(file), progress: 0 }))])} />{!!photos.length && <ul className="grid grid-cols-3 gap-2">{photos.map((photo, index) => <li key={photo.preview} className="relative h-20 overflow-hidden rounded-sm bg-secondary"><img src={photo.preview} alt={`Selected review evidence ${index + 1}`} className="size-full object-cover" /><button type="button" aria-label={`Remove review evidence ${index + 1}`} onClick={() => { URL.revokeObjectURL(photo.preview); setPhotos(current => current.filter((_, position) => position !== index)); }} className="absolute right-1 top-1 grid size-8 place-items-center rounded-full bg-forest/80 text-white"><Trash2 size={14} aria-hidden="true" /></button></li>)}</ul>}</>}
-        {confirmationIntent ? <ConfirmationReadiness user={user} report={report} evidence={caseEvidence} assignments={caseAssignments} pending={pending} onDraft={setCandidateDraft} /> : <Button disabled={pending || description.trim().length < 5}>{save.isPending ? "Saving…" : attempted ? "Retry unchanged action" : "Save review"}</Button>}
+        {confirmationIntent ? <ConfirmationReadiness user={user} report={report} evidence={caseEvidence} assignments={caseAssignments} pending={pending} onDraft={setCandidateDraft} /> : <Button disabled={reviewUnavailable || pending || description.trim().length < 5}>{save.isPending ? "Saving…" : attempted ? "Retry unchanged action" : "Save review"}</Button>}
       </fieldset>
       {save.error && <p role="alert" className="text-sm">{save.error.message}</p>}
       {save.isSuccess && <p role="status" className="text-sm">Report review saved privately.</p>}
