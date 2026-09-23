@@ -3,13 +3,14 @@ import { ArrowUpRight, CircleAlert, RefreshCw } from "lucide-react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { fernLayer } from "@/assets";
 import { Button } from "@/components/ui";
+import { isMonitoringDetailPath } from "@/lib/page-title";
 import type { DashboardUser } from "@/types";
 
 export const panelClass = "rounded-xl border border-primary/10 bg-white shadow-[0_18px_50px_-42px_rgba(67,25,31,0.9)]";
 export type ChartPart = { label: string; value: number; color: string };
 
-export function PageIntro({ eyebrow, title, description, icon: Icon, action }: { eyebrow: string; title: string; description: string; icon?: LucideIcon; action?: React.ReactNode }) {
-  return <section className="relative isolate overflow-hidden rounded-2xl border border-primary/10 bg-linear-120 from-background via-secondary via-54% to-sage px-5 py-7 sm:px-8 sm:py-8"><img src={fernLayer} alt="" aria-hidden="true" width={900} height={600} className="pointer-events-none absolute -right-20 -top-24 -z-10 w-[min(58vw,520px)] -scale-x-100 opacity-[0.13]" /><div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end"><div><p className="text-xs font-extrabold uppercase tracking-[0.14em] text-primary/65">{eyebrow}</p><h2 className="mt-3 max-w-[22ch] text-[clamp(30px,3vw,44px)] font-extrabold leading-[1.05] tracking-[-0.04em]">{title}</h2><p className="mt-3 max-w-[68ch] text-sm leading-7 text-muted-foreground">{description}</p></div>{(action || Icon) && <div className="flex items-center gap-3">{action}{Icon && <span className="grid size-12 place-items-center rounded-xl border border-primary/10 bg-white/75 text-primary backdrop-blur-sm"><Icon size={23} strokeWidth={1.7} aria-hidden="true" /></span>}</div>}</div></section>;
+export function PageIntro({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) {
+  return <section className="relative isolate overflow-hidden rounded-2xl border border-primary/10 bg-linear-120 from-background via-secondary via-54% to-sage px-5 py-7 sm:px-8 sm:py-8"><img src={fernLayer} alt="" aria-hidden="true" width={900} height={600} className="pointer-events-none absolute -right-20 -top-24 -z-10 w-[min(58vw,520px)] -scale-x-100 opacity-[0.13]" /><div><p className="text-xs font-extrabold uppercase tracking-[0.14em] text-primary/65">{eyebrow}</p><h2 className="mt-3 max-w-[22ch] text-[clamp(30px,3vw,44px)] font-extrabold leading-[1.05] tracking-[-0.04em]">{title}</h2><p className="mt-3 max-w-[68ch] text-sm leading-7 text-muted-foreground">{description}</p></div></section>;
 }
 
 export function SectionHeading({ title, description, aside }: { title: string; description: string; aside?: React.ReactNode }) {
@@ -46,6 +47,6 @@ export function StatusPill({ children, tone = "neutral" }: { children: React.Rea
 
 export function MasterDetail({ user, children }: { user: DashboardUser; children: React.ReactNode }) {
   const { pathname } = useLocation();
-  const detailOpen = /\/monitoring\/(reports|cases|users)\/[^/]+$/.test(pathname);
+  const detailOpen = isMonitoringDetailPath(pathname);
   return <div className="min-w-0">{detailOpen ? <Outlet context={{ user }} /> : children}</div>;
 }

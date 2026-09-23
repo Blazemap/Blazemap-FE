@@ -13,3 +13,6 @@ export function reportStatusLabel(report: Pick<OwnReport, "reviewStatus" | "case
   const status = reportStatus(report);
   return status ? reportStatusLabels[status] : "Awaiting review";
 }
+export function reportEditingLocation(caseItem: { handlingStatus: string } | null, reportCount: number) {
+  return caseItem && (caseItem.handlingStatus === "CLOSED" || reportCount > 1) ? "CASE" : "REPORT";
+}

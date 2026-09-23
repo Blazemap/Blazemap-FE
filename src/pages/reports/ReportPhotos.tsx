@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Dialog } from "radix-ui";
-import { downloadPhoto } from "@/api/reports";
+import { downloadPhotoBlob } from "@/api/reports";
 import { Button } from "@/components/ui";
 import { useAccount } from "@/hooks/useAccount";
 import type { DashboardUser } from "@/types";
@@ -24,12 +24,14 @@ function PhotoCard({ user, photo, index }: { user: DashboardUser; photo: Photo; 
   useEffect(() => {
     const controller = new AbortController();
     const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(20000)]);
-    void downloadPhoto({ id, role } as DashboardUser, photo.id, signal).then(url => {
-      if (!controller.signal.aborted) setState({ url });
+    let objectUrl: string | undefined;
+    void downloadPhotoBlob({ id, role } as DashboardUser, photo.id, "private", signal).then(blob => {
+      objectUrl = URL.createObjectURL(blob);
+      if (!controller.signal.aborted) setState({ url: objectUrl });
     }).catch(() => {
       if (!controller.signal.aborted) setState({ error: true });
     });
-    return () => controller.abort();
+    return () => { controller.abort(); if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [id, role, photo.id, attempt]);
   function reload() { setState({}); setAttempt(value => value + 1); }
   function changeOpen(value: boolean) { setOpen(value); reload(); }

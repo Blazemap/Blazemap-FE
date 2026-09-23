@@ -85,7 +85,7 @@ export default function HomePage() {
         <img src={rainforestSmall} alt="" width={768} height={512} loading="lazy" className="absolute inset-0 -z-20 h-full w-full object-cover object-center opacity-25" />
         <div aria-hidden="true" className="absolute inset-0 -z-10 bg-linear-to-r from-forest via-forest/90 to-primary/75" />
         <Reveal className="relative z-10 mx-auto grid max-w-[1440px] gap-8 px-[clamp(40px,13vw,208px)] py-16 md:grid-cols-[1fr_1fr] md:items-center md:gap-16 lg:py-20">
-          <h2 id="safety-title" className="text-[clamp(36px,4vw,54px)] leading-[1.15] font-extrabold tracking-[-0.04em]">The forest matters.<br /><span className="box-decoration-clone bg-background px-2 text-primary">Your safety comes first.</span></h2>
+          <h2 id="safety-title" className="text-[clamp(36px,4vw,54px)] leading-[1.15] font-extrabold tracking-[-0.04em]">The forest matters.<br /><span className="text-white">Your safety comes first.</span></h2>
           <p className="max-w-[48ch] text-base leading-8 text-background/85">Stay away from smoke and flames. Never approach a suspected fire to collect evidence. In immediate danger, move to safety and contact local emergency services.</p>
         </Reveal>
       </aside>

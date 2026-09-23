@@ -20,6 +20,8 @@ export function WorkspaceNav({ user, children }: { user: DashboardUser; children
     params.delete("observation");
     params.delete("my-reports");
     params.delete("case");
+    params.delete("news-case");
+    params.delete("feed-report");
     if (view !== "map") params.set("view", view);
     else params.delete("view");
     const query = params.toString();

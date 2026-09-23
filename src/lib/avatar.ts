@@ -14,6 +14,11 @@ export function uploadedAvatar(value: unknown): value is string {
 export function avatarSource(image: unknown, uploadedUrl?: string): string | undefined {
   return uploadedAvatar(image) ? uploadedUrl : googleAvatar(image);
 }
+export function monitoringAvatarImage(image: unknown): { kind: "uploaded"; value: string } | { kind: "remote"; value: string } | null {
+  if (uploadedAvatar(image)) return { kind: "uploaded", value: image };
+  const remote = googleAvatar(image);
+  return remote ? { kind: "remote", value: remote } : null;
+}
 export function cropRect(width: number, height: number, zoom: number, x: number, y: number) {
   if (![width, height, zoom, x, y].every(Number.isFinite) || width < 1 || height < 1 || zoom < 1 || zoom > 4) throw new Error("Invalid crop");
   const size = Math.min(width, height) / zoom;

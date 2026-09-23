@@ -3,7 +3,7 @@ export type Polygon = { type: "Polygon"; coordinates: Position[][] };
 export type PublicPerimeter = { geometry: Polygon; observedAt: string; source: string; areaHectares: number; revision: number };
 export type Drawing = { rings: Position[][]; closed: boolean[]; active: number };
 export type DrawingAction = { type: "add"; point: Position } | { type: "move"; index: number; point: Position } | { type: "delete"; index: number } | { type: "close" } | { type: "reopen" } | { type: "ring"; index: number } | { type: "hole" } | { type: "delete-hole" };
-export type PerimeterDraft = { attempted?: boolean; confirmation?: { fieldUpdateId: string }; caseId: string; version: number; drawing: Drawing; history: Drawing[]; observedAt: string; source: string; reason: string; authority: string; pending: boolean; fit: number };
+export type PerimeterDraft = { attempted?: boolean; confirmation?: { fieldUpdateId: string; reuseFieldObservation?: boolean }; caseId: string; version: number; drawing: Drawing; history: Drawing[]; observedAt: string; source: string; reason: string; authority: string; pending: boolean; fit: number };
 
 const same = (a: Position, b: Position) => a[0] === b[0] && a[1] === b[1];
 const cross = (a: Position, b: Position, c: Position) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);

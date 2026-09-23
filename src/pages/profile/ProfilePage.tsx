@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { AvatarEditor } from "./components";
+import NearbyPreferences from "@/components/notifications/NearbyPreferences";
 import { useOutletContext } from "react-router-dom";
 import { Check, Eye, EyeOff, KeyRound, UserRound } from "lucide-react";
 import { DraftGuard } from "@/components/common";
@@ -47,6 +48,7 @@ function Profile({ initial }: { initial: DashboardUser }) {
         <nav aria-label="Account sections" className="grid grid-cols-2 gap-2 rounded-2xl border border-primary/10 bg-white p-2 shadow-sm md:flex md:flex-col">{([['profile', 'Profile', UserRound], ['password', 'Change password', KeyRound]] as const).map(([value, label, Icon]) => <button key={value} type="button" disabled={pending} aria-pressed={section === value} aria-controls="account-settings" onClick={() => setSection(value)} className={`flex min-h-12 flex-1 items-center gap-3 rounded-xl px-4 text-left text-sm font-bold ${section === value ? "bg-primary text-white" : "hover:bg-secondary"}`}><Icon size={18} aria-hidden="true" />{label}</button>)}</nav>
         <section id="account-settings" aria-labelledby="settings-title" className="overflow-hidden rounded-2xl border border-primary/10 bg-white shadow-sm">
           <header className="border-b border-primary/10 px-6 py-5"><h2 id="settings-title" className="text-xl font-extrabold">{section === "profile" ? "Profile details" : "Change password"}</h2></header>
+          {section === "profile" && user.role === "USER" && <NearbyPreferences user={user} />}
           <div hidden={section !== "profile"}><AvatarEditor user={user} disabled={pending} onSaved={setUser} onState={handlePhotoState} /></div>
           {section === "profile" ? <form className="space-y-6 p-6" onSubmit={event => { event.preventDefault(); if (!valid || !dirtyName || pending) return; mutation.mutate(name, { onSuccess: updated => { setUser(updated); setName(updated.name); } }); }}>
             <div><label htmlFor="profile-name" className="text-sm font-bold">Full name</label><input id="profile-name" autoComplete="name" required maxLength={100} value={name} disabled={pending} aria-invalid={!valid} aria-describedby="profile-status" className={input} onChange={event => { setName(event.target.value); mutation.reset(); }} /></div>

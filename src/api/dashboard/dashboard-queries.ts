@@ -18,11 +18,12 @@ async function request(path: string, signal: AbortSignal, params: URLSearchParam
     throw new DashboardError(isAxiosError(error) ? error.response?.status : 0);
   }
 }
-export function mapQueryOptions(user: DashboardUser, hours: number) {
-  return { queryKey: queryKeys.dashboard.map(user, hours), queryFn: async ({ signal }: { signal: AbortSignal }) => {
+export function mapQueryOptions(user: DashboardUser, hours: number, caseStatus: "active" | "closed" | "all" = "active") {
+  return { queryKey: [...queryKeys.dashboard.map(user, hours), caseStatus], queryFn: async ({ signal }: { signal: AbortSignal }) => {
     if (![24, 48, 168].includes(hours)) throw new DashboardError();
     const to = new Date();
     const params = new URLSearchParams({ from: new Date(to.getTime() - hours * 3600000).toISOString(), to: to.toISOString() });
+    if (user.role === "ADMIN") params.set("caseStatus", caseStatus);
     return parseMap(await request(apiEndpoints.map, signal, params));
   } };
 }
@@ -46,7 +47,7 @@ export function casesQueryOptions(user: DashboardUser, filters: CaseFilters) {
   return { queryKey: queryKeys.dashboard.cases(user, filters), enabled: user.role === "ADMIN", queryFn: async ({ signal }: { signal: AbortSignal }) => {
     if (user.role !== "ADMIN") throw new DashboardError(403);
     const { query, verification, handling = "", priority, page, all = false } = filters;
-    if (!Number.isInteger(page) || page < 1 || query.length > 200 || !["", "UNVERIFIED", "CONFIRMED_FIRE", "NOT_FIRE"].includes(verification) || !["", "OPEN", "CHECK_SCHEDULED", "ON_SCENE", "RESPONDING", "MONITORING", "CLOSED"].includes(handling) || !["", "HIGH", "MEDIUM", "LOW", "UNASSESSED"].includes(priority)) throw new DashboardError();
+    if (!Number.isInteger(page) || page < 1 || query.length > 200 || !["", "UNVERIFIED", "CONFIRMED_FIRE", "NOT_FIRE"].includes(verification) || !["", "OPEN", "CHECK_SCHEDULED", "ON_SCENE", "RESPONDING", "MONITORING", "CLOSED"].includes(handling) || !["", "CRITICAL", "HIGH", "MEDIUM", "LOW", "UNASSESSED"].includes(priority)) throw new DashboardError();
     const pageSize = all ? 100 : 20;
     const loadPage = async (requestedPage: number) => {
       const params = new URLSearchParams({ page: String(requestedPage), pageSize: String(pageSize) });

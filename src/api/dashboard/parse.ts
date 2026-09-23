@@ -52,13 +52,21 @@ function ownReport(raw: unknown): OwnReport {
   const linked = item.case === null ? null : record(item.case);
   const observations: OwnReport["observationTypes"] = array(item.observationTypes).map(value => choice(value, ["SMOKE", "FLAME", "BURNING_SMELL"] as const));
   const coordinates = point(item);
+  let perimeter: PublicPerimeter | null = null;
+  if (linked?.perimeter && linked.verificationStatus === "CONFIRMED_FIRE") {
+    const p = record(linked.perimeter);
+    const geometry = parsePolygon(p.geometry);
+    const areaHectares = number(p.areaHectares), revision = number(p.revision);
+    if (areaHectares <= 0 || !Number.isInteger(revision) || revision < 1 || Math.abs(polygonArea(geometry) - areaHectares) > Math.max(1e-8, areaHectares * 1e-9)) throw new Error("Invalid owner perimeter");
+    perimeter = { geometry, areaHectares, revision, source: text(p.source), observedAt: date(p.observedAt) };
+  }
   return {
     id: text(item.id), number: text(item.number), observationTypes: observations, observedAt: date(item.observedAt), createdAt: date(item.createdAt),
     locationMode: choice(item.locationMode, ["INCIDENT_ESTIMATE", "OBSERVER_POSITION"]), ...coordinates,
     accuracyMeters: item.accuracyMeters == null ? null : number(item.accuracyMeters), locationDescription: text(item.locationDescription), description: text(item.description),
     reviewStatus: choice(item.reviewStatus, ["NEW", "UNDER_REVIEW", "NEEDS_DETAILS", "REVIEWED", "DECLINED"]),
     region: region ? { id: text(region.id), name: text(region.name), timezone: text(region.timezone) } : null,
-    case: linked ? { number: text(linked.number), verificationStatus: text(linked.verificationStatus), handlingStatus: text(linked.handlingStatus) } : null,
+    case: linked ? { number: text(linked.number), title: linked.title == null ? undefined : text(linked.title), verificationStatus: text(linked.verificationStatus), handlingStatus: text(linked.handlingStatus), perimeter } : null,
     windContext: item.windContext === undefined ? undefined : parseWindContext(item.windContext),
     attachments: array(item.attachments).map(value => { const attachment = record(value); return { id: text(attachment.id), filename: text(attachment.filename), size: number(attachment.size), contentType: text(attachment.contentType) }; }),
   };
@@ -89,6 +97,10 @@ export function parseMap(body: unknown): MapData {
        verification: verification(item.verificationStatus), handling: handling(item.handlingStatus), stale: false,
     };
   });
+  for (const raw of array(data.nearbyCases ?? [])) {
+    const item = record(raw), perimeter = record(item.publicPerimeter), geometry = parsePolygon(perimeter.geometry), areaHectares = number(perimeter.areaHectares), revision = number(perimeter.revision);
+    items.push({ id: `case:${text(item.id)}`, kind: "publication", title: text(item.title), ...point(item), time: date(item.updatedAt), source: "Confirmed nearby case", location: "Within 2 km of your saved location", publicLocationMode: "APPROVED_INCIDENT_PERIMETER", publicPerimeter: { geometry, areaHectares, revision, source: text(perimeter.source), observedAt: date(perimeter.observedAt) }, verification: verification(item.verificationStatus), handling: handling(item.handlingStatus), stale: false });
+  }
   for (const raw of hotspots) {
     const item = record(raw);
     if (item.indicationType !== "THERMAL_ANOMALY" || typeof item.stale !== "boolean" || item.frpUnit !== "MW") throw new Error("Invalid response");
@@ -121,8 +133,9 @@ export function parseMap(body: unknown): MapData {
   const ownReports = array(data.ownReports ?? []).map(ownReport);
   const privateReports = parseGovernmentReports({ data: array(data.privateReports ?? []), meta: { total: array(data.privateReports ?? []).length, page: 1, pageSize: Math.max(1, Math.min(100, array(data.privateReports ?? []).length || 1)) } }).data;
   const privateCases = parseCases({ data: array(data.privateCases ?? []), meta: { total: array(data.privateCases ?? []).length, page: 1, pageSize: Math.max(1, Math.min(100, array(data.privateCases ?? []).length || 1)) } }).items;
+  const operationalFeatures = array(data.operationalFeatures ?? []).map(raw => { const feature = record(raw), kind = choice(feature.kind, ["ROAD", "WATER_SOURCE"] as const), coordinates = point(feature); if (!hasPoint(coordinates)) throw new Error("Invalid operational feature"); return { id: text(feature.id), name: text(feature.name), kind, ...coordinates, condition: feature.condition == null ? null : text(feature.condition), observedAt: feature.observedAt == null ? null : date(feature.observedAt) }; });
   if (data.privateLimited !== undefined && typeof data.privateLimited !== "boolean") throw new Error("Invalid private map limit");
-  return { items, ownReports, privateReports, privateCases, privateLimited: data.privateLimited === true, demoAreas, sourceStatus, updatedAt: data.updatedAt === null ? null : date(data.updatedAt), lastSuccessAt: source.lastSuccessAt === undefined ? null : date(source.lastSuccessAt), limited: hotspots.length >= 2000 };
+  return { items, ownReports, privateReports, privateCases, operationalFeatures, privateLimited: data.privateLimited === true, demoAreas, sourceStatus, updatedAt: data.updatedAt === null ? null : date(data.updatedAt), lastSuccessAt: source.lastSuccessAt === undefined ? null : date(source.lastSuccessAt), limited: hotspots.length >= 2000 };
 }
 export function parseCases(body: unknown): CasesData {
   const data = record(body);
@@ -134,6 +147,6 @@ export function parseCases(body: unknown): CasesData {
     const perimeter = item.perimeter == null ? null : parsePolygon(item.perimeter);
     const perimeterRevision = item.perimeterRevision === undefined ? 0 : number(item.perimeterRevision);
     if (!Number.isInteger(perimeterRevision) || perimeterRevision < 0 || (perimeter && perimeterRevision < 1)) throw new Error("Invalid perimeter revision");
-    return { id: text(item.id), number: text(item.number), title: text(item.title), ...point(item), regionId: item.regionId == null ? null : text(item.regionId), verification: verification(item.verificationStatus), handling: handling(item.handlingStatus), priority: choice(item.priority, ["HIGH", "MEDIUM", "LOW", "UNASSESSED"]), priorityReason: item.priorityReason === null ? null : text(item.priorityReason), updatedAt: date(item.updatedAt), openedAt: date(item.openedAt), perimeter, perimeterRevision };
+    return { id: text(item.id), number: text(item.number), title: text(item.title), ...point(item), regionId: item.regionId == null ? null : text(item.regionId), verification: verification(item.verificationStatus), handling: handling(item.handlingStatus), priority: choice(item.priority, ["CRITICAL", "HIGH", "MEDIUM", "LOW", "UNASSESSED"]), priorityReason: item.priorityReason === null ? null : text(item.priorityReason), updatedAt: date(item.updatedAt), openedAt: date(item.openedAt), perimeter, perimeterRevision };
   }) };
 }

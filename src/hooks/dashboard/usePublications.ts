@@ -4,7 +4,7 @@ import { apiClient } from "@/config/api-client";
 import { AuthError } from "@/lib";
 import { feedPageSize, nextFeedPage, uniqueFeedItems, type CitizenFeedItem, type FeedPage, type Publication } from "@/lib/publications";
 import { queryKeys } from "@/api/queryKeys";
-import { apiEndpoints } from "@/constants";
+import { apiEndpoints, dashboardRefreshMs } from "@/constants";
 import type { DashboardUser } from "@/types";
 import { checkDashboardAccount, clearDashboardQueries } from "./session";
 
@@ -25,7 +25,9 @@ export function useCitizenFeed(user: DashboardUser, enabled = true) {
   const query = useInfiniteQuery({
     queryKey: queryKeys.dashboard.feed(user),
     enabled: user.role === "USER" && enabled,
-    gcTime: 0,
+    gcTime: 300_000,
+    staleTime: 30_000,
+    refetchInterval: dashboardRefreshMs,
     retry: false,
     initialPageParam: 1,
     queryFn: ({ pageParam, signal }) => publicRequest<FeedPage<CitizenFeedItem>>(user, apiEndpoints.feed, signal, { page: pageParam, pageSize: feedPageSize }),
@@ -40,7 +42,8 @@ export function usePublications(user: DashboardUser, news: boolean, from?: strin
   const query = useInfiniteQuery({
     queryKey: ["dashboard", user.id, user.role, "publications", news, from],
     enabled,
-    gcTime: 0,
+    gcTime: 300_000,
+    staleTime: 30_000,
     retry: false,
     initialPageParam: 1,
     queryFn: ({ pageParam, signal }) => publicRequest<FeedPage<Publication>>(user, "/api/public/information", signal, { page: pageParam, pageSize: feedPageSize, ...(news ? { news: "true" } : { feed: "true", ...(from ? { from } : {}) }) }),

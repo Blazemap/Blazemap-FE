@@ -1,6 +1,9 @@
 export type NotificationItem = {
   id: string;
-  reportId: string;
+  reportId: string | null;
+  publicationId: string | null;
+  caseId: string | null;
+  publication: { slug: string } | null;
   type: string;
   title: string;
   message: string;

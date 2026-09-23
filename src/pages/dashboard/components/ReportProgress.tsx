@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Button, EvidenceUpload } from "@/components/ui";
+import { Button, EvidenceUpload, FieldLength } from "@/components/ui";
 import { uploadPhoto } from "@/api/reports";
 import { governmentRequest } from "@/api/dashboard/government";
 import { useGovernmentMutation } from "@/hooks/dashboard/useGovernment";
@@ -35,6 +35,7 @@ export default function ReportProgress({ user, reportId, disabled, onDraft }: { 
       <label htmlFor="progress-description" className="block text-sm font-bold">Update for the report owner <span aria-hidden="true">*</span></label>
       <p id="progress-description-help" className="text-xs text-muted-foreground">Describe progress or the next action in 5–2,000 characters. This update and any photos are visible to the report owner and government reviewers, not public News. Adding progress does not confirm fire.</p>
       <textarea id="progress-description" aria-describedby="progress-description-help" required aria-required="true" minLength={5} maxLength={2000} disabled={attempted} value={description} onChange={event => setDescription(event.target.value)} className="mt-1 min-h-24 w-full rounded-lg border p-3" />
+      <FieldLength value={description} min={5} max={2000} />
       <section aria-label="Optional evidence photos" className="border-t pt-4">
         <EvidenceUpload count={photos.length} disabled={attempted || disabled || save.isPending} error={error} onError={setError} onFiles={files => setPhotos(current => [...current, ...files.map(file => ({ file, preview: URL.createObjectURL(file), progress: 0 }))])} />
       </section>

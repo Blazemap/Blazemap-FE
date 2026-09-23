@@ -19,7 +19,7 @@ const sections: LegalSection[] = [
   {
     id: "information-limitations",
     title: "Information limitations",
-    content: <><p>A NASA FIRMS hotspot is a detected thermal anomaly, not a confirmed fire. A community report is an observation, not a confirmed fire. Multiple reports may support investigation but do not confirm an incident by count alone.</p><p>An absence of satellite detections does not prove an absence of fire. BMKG information is a regional forecast, not a live sensor reading at the incident point. Peatland, road, river, facility, and settlement layers describe available context and may be incomplete or outdated.</p><p>Source time, freshness, and availability matter. Blazemap may distinguish unavailable, stale, not configured, not yet synchronized, and successful no-result states.</p></>,
+    content: <><p>A NASA FIRMS hotspot is a detected thermal anomaly, not a confirmed fire. A community report is an observation, not a confirmed fire. Multiple reports may support investigation but do not confirm an incident by count alone.</p><p>An absence of satellite detections does not prove an absence of fire. Google Weather current conditions at case coordinates are not an on-site measurement or confirmation of an incident. Peatland, road, river, facility, and settlement layers describe available context and may be incomplete or outdated.</p><p>Source time, freshness, and availability matter. Blazemap may distinguish unavailable, stale, not configured, not yet synchronized, and successful no-result states.</p></>,
   },
   {
     id: "ai-and-human-authority",

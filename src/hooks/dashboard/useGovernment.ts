@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AuthError, dashboardLogin } from "@/lib";
 import { DashboardError } from "@/api/dashboard";
-import { GovernmentError, getCaseDetail, getGovernmentReport, getGovernmentReports, getReportCandidates } from "@/api/dashboard/government";
+import { GovernmentError, getCaseDetail, getCompletionReport, getGovernmentReport, getGovernmentReports, getReportCandidates } from "@/api/dashboard/government";
 import { queryKeys } from "@/api/queryKeys";
 import type { DashboardUser } from "@/types";
 import { checkDashboardAccount, clearDashboardQueries } from "./session";
@@ -65,12 +65,15 @@ export function useGovernmentReport(user: DashboardUser, id: string | null) {
 export function useGovernmentCase(user: DashboardUser, id: string) {
   return useDashboardResource(user, queryKeys.dashboard.case(user, id), ({ signal }) => load(() => getCaseDetail(id, signal)), true, user.role === "ADMIN" && !!id);
 }
-export function useReportCandidates(user: DashboardUser, id: string, criteria: { distance: number; hours: number } | null, kind: "reports" | "hotspots" = "reports") {
-  return useDashboardResource(user, ["dashboard", user.id, user.role, "report-candidates", kind, id, criteria], ({ signal }) => load(() => getReportCandidates(id, criteria!.distance, criteria!.hours, signal, kind)), false, user.role === "ADMIN" && criteria !== null);
+export function useCompletionReport(user: DashboardUser, caseId: string) {
+  return useDashboardResource(user, ["dashboard", user.id, user.role, "completion-report", caseId], ({ signal }) => load(() => getCompletionReport(caseId, signal)), false, user.role === "ADMIN" && user.canPublishInformation === true && !!caseId);
 }
-export function useGovernmentMutation<T, R>(user: DashboardUser, action: (input: T) => Promise<R>, capability?: "canConfirmIncidents" | "canPublishInformation") {
+export function useReportCandidates(user: DashboardUser, id: string, criteria: { distance: number; hours: number } | null) {
+  return useDashboardResource(user, ["dashboard", user.id, user.role, "report-candidates", id, criteria], ({ signal }) => load(() => getReportCandidates(id, criteria!.distance, criteria!.hours, signal)), false, user.role === "ADMIN" && criteria !== null);
+}
+export function useGovernmentMutation<T, R>(user: DashboardUser, action: (input: T) => Promise<R>, capability?: "canConfirmIncidents" | "canPublishInformation", successMessage?: string) {
   const client = useQueryClient();
-  return useMutation({ retry: false, mutationFn: async (input: T) => {
+  return useMutation({ retry: false, meta: { successMessage }, mutationFn: async (input: T) => {
     const current = await checkDashboardAccount(user, AbortSignal.timeout(20000));
     if (current.role !== "ADMIN" || (capability && !current[capability])) throw new GovernmentError("Your current account lacks this capability.", 403);
     return action(input);

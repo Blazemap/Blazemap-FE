@@ -7,9 +7,11 @@ export function useNotifications(user: DashboardUser) {
   const client = useQueryClient();
   const query = useInfiniteQuery({
     queryKey: queryKeys.dashboard.notifications(user),
-    enabled: user.role === "USER",
+    enabled: true,
     gcTime: 0,
     retry: false,
+    refetchInterval: 45000,
+    refetchIntervalInBackground: false,
     initialPageParam: undefined as string | undefined,
     queryFn: ({ pageParam, signal }) => getNotifications(user, pageParam, signal),
     getNextPageParam: page => page.meta.nextCursor ?? undefined,

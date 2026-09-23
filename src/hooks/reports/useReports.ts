@@ -12,5 +12,5 @@ export function useMutationCreateReport(user: DashboardUser) {
 }
 export function useMutationAddReportUpdate(user: DashboardUser, id: string) {
   const client = useQueryClient();
-  return useMutation({ mutationFn: (message: string) => addReportUpdate(user, id, message), retry: false, gcTime: 0, onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.dashboard.report(user, id) }) });
+  return useMutation({ mutationFn: (input: { message: string; attachmentIds: string[] }) => addReportUpdate(user, id, input.message, input.attachmentIds), retry: false, gcTime: 0, onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.dashboard.report(user, id) }) });
 }

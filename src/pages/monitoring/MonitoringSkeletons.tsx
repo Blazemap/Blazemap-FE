@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-type Column = { label: string; width: number; shape?: "identity" | "record" | "condition" | "freshness" | "pill" | "icons" | "edit" | "case" | "link"; padding?: string };
+type Column = { label: string; width: number; shape?: "identity" | "user" | "record" | "condition" | "freshness" | "pill" | "icons" | "edit" | "case" | "link"; padding?: string };
 const edge = "px-5 sm:px-6";
 const action: Column = { label: "Action", width: 104, shape: "link", padding: `${edge} text-right` };
 const condition: Column = { label: "Condition", width: 210, shape: "condition" };
@@ -13,7 +13,7 @@ export const monitoringTableShapes: Record<string, { minWidth: string; columns: 
   assignments: { minWidth: "min-w-[820px]", columns: [{ label: "Case", width: 240, shape: "case", padding: "px-5" }, { label: "Team", width: 140 }, { label: "Status", width: 100, shape: "pill" }, freshness, editAction] },
   reports: { minWidth: "min-w-[980px]", columns: [{ label: "Report", width: 220, shape: "identity", padding: edge }, { label: "Observations", width: 88, shape: "icons" }, { label: "Priority", width: 80 }, { label: "Workflow", width: 110 }, { label: "Location", width: 160 }, { label: "Observed", width: 130, padding: edge }, action] },
   cases: { minWidth: "min-w-[900px]", columns: [{ label: "Case", width: 220, shape: "identity", padding: edge }, { label: "Verification", width: 135 }, { label: "Handling", width: 130 }, { label: "Priority", width: 90 }, { label: "Context updated", width: 140, padding: edge }, action] },
-  users: { minWidth: "min-w-[900px]", columns: [{ label: "User", width: 220, shape: "identity", padding: edge }, { label: "Role", width: 80, shape: "pill" }, { label: "Account", width: 80, shape: "pill" }, { label: "Email", width: 90, shape: "pill" }, { label: "Created", width: 140, padding: edge }, action] },
+  users: { minWidth: "min-w-[900px]", columns: [{ label: "User", width: 220, shape: "user", padding: edge }, { label: "Role", width: 80, shape: "pill" }, { label: "Account", width: 80, shape: "pill" }, { label: "Email", width: 90, shape: "pill" }, { label: "Created", width: 140, padding: edge }, action] },
 };
 const panel = "rounded-xl border border-primary/10 bg-white shadow-[0_18px_50px_-42px_rgba(67,25,31,0.9)]";
 function Mark({ className = "h-4 w-3/4" }: { className?: string }) {
@@ -30,6 +30,7 @@ function Cell({ shape }: { shape?: Column["shape"] }) {
   if (shape === "link") return <div className="flex min-h-11 items-center justify-end"><Mark className="h-3 w-20" /></div>;
   if (shape === "condition") return <><Mark className="h-6 w-24 rounded-full" /><div className="mt-2 space-y-2"><Mark className="h-3 w-full" /><Mark className="h-3 w-4/5" /></div></>;
   if (shape === "freshness") return <><Mark className="h-3 w-full" /><Mark className="mt-1 h-3 w-4/5" /></>;
+  if (shape === "user") return <div className="flex items-center gap-3"><Mark className="size-11 shrink-0 rounded-full" /><div className="min-w-0 flex-1"><Mark className="h-4 w-3/4" /><Mark className="mt-2 h-3 w-full" /></div></div>;
   if (shape === "identity" || shape === "record") return <><div className={shape === "identity" ? "flex min-h-11 items-center" : "flex h-5 items-center"}><Mark className="h-4 w-3/4" /></div><Mark className="mt-1 h-4 w-full" /></>;
   return <Mark />;
 }
@@ -60,8 +61,14 @@ export function StatSkeletons() {
 export function DistributionSkeleton() {
   return <Loading label="Loading operational distribution"><div className="grid gap-5 xl:grid-cols-2 2xl:grid-cols-4">{[3, 4, 6, 5].map((count, index) => <section key={index} className={`${panel} flex flex-col p-5 sm:p-6`}><Mark className="h-6 w-40" /><Mark className="mt-1 h-4 w-32" />{index === 0 ? <div className="mt-6 grid flex-1 items-center gap-6 sm:grid-cols-[150px_1fr] xl:grid-cols-1 2xl:grid-cols-[150px_1fr]"><div className="relative mx-auto size-36 rounded-full bg-secondary"><div className="absolute inset-5 grid place-items-center rounded-full bg-white"><Mark className="h-9 w-12" /></div></div><div className="space-y-3">{Array.from({ length: count }, (_, row) => <div key={row} className="flex items-center justify-between gap-4"><Mark className="h-5 w-28" /><Mark className="h-5 w-5" /></div>)}</div></div> : <div className="mt-6 flex-1 space-y-4">{Array.from({ length: count }, (_, row) => <div key={row}><div className="mb-2 flex justify-between gap-4"><Mark className="h-4 w-24" /><Mark className="h-4 w-5" /></div><Mark className="h-2.5 w-full rounded-full" /></div>)}</div>}<div className="mt-5 flex min-h-11 justify-end border-t border-primary/10 pt-4"><Mark className="h-4 w-24" /></div></section>)}</div></Loading>;
 }
-export function QueueSkeleton() {
-  return <Loading label="Loading priority report queue"><ol className="divide-y divide-primary/10">{Array.from({ length: 5 }, (_, row) => <li key={row} className="grid gap-4 px-5 py-4 sm:grid-cols-[1fr_auto] sm:px-6"><div><div className="flex flex-wrap items-center gap-2"><Mark className="h-5 w-24" /><Mark className="h-5 w-20 rounded-full" /><Mark className="h-4 w-24" /></div><Mark className="mt-2 h-6 w-full" /><Mark className="mt-2 h-4 w-4/5" /></div><Cell shape="icons" /></li>)}</ol></Loading>;
+export function QueueSkeleton({ label = "Loading priority report queue" }: { label?: string }) {
+  return <Loading label={label}><ol className="divide-y divide-primary/10">{Array.from({ length: 5 }, (_, row) => <li key={row} className="grid gap-4 px-5 py-4 sm:grid-cols-[1fr_auto] sm:px-6"><div><div className="flex flex-wrap items-center gap-2"><Mark className="h-5 w-24" /><Mark className="h-5 w-20 rounded-full" /><Mark className="h-4 w-24" /></div><Mark className="mt-2 h-6 w-full" /><Mark className="mt-2 h-4 w-4/5" /></div><Cell shape="icons" /></li>)}</ol></Loading>;
+}
+export function AssignmentRowsSkeleton() {
+  return <Loading label="Loading team assignments" className="mt-6"><div className="grid gap-4">{Array.from({ length: 2 }, (_, index) => <div key={index} className="rounded-xl border border-primary/10 bg-secondary/15 p-4 sm:p-5"><div className="flex justify-between gap-3"><div className="flex-1"><Mark className="h-3 w-24" /><Mark className="mt-2 h-5 w-40" /></div><Cell shape="pill" /></div><div className="mt-5 grid gap-4 border-t border-primary/10 pt-4 sm:grid-cols-[1fr_auto]"><div><Mark className="h-3 w-28" /><Mark className="mt-2 h-4 w-full" /></div><div><Mark className="h-3 w-28" /><Mark className="mt-2 h-4 w-32" /></div></div><div className="mt-5 flex justify-end border-t border-primary/10 pt-4"><Mark className="h-11 w-32 rounded-full" /></div></div>)}</div></Loading>;
+}
+export function OperationsDetailSkeleton({ label }: { label: string }) {
+  return <Loading label={label}><section className={`${panel} p-5 sm:p-6`}><div className="flex justify-between gap-5"><div className="flex-1"><Mark className="h-7 w-52" /><Mark className="mt-2 h-4 w-64" /></div><Mark className="h-11 w-32 rounded-full" /></div><Fields count={6} /><div className="mt-6 border-t border-primary/10 pt-6"><Mark className="h-5 w-36" /><Mark className="mt-3 h-4 w-full" /><Mark className="mt-2 h-4 w-4/5" /></div></section></Loading>;
 }
 export function HealthSkeleton() {
   return <Loading label="Loading source health"><ul className="mt-5 divide-y divide-primary/10">{Array.from({ length: 4 }, (_, row) => <li key={row} className="flex items-center justify-between gap-4 py-4"><Mark className="h-5 w-24" /><Cell shape="pill" /></li>)}</ul></Loading>;

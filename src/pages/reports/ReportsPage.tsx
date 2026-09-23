@@ -1,11 +1,13 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { ArrowLeft, ArrowUpRight, Clock3, Flame, ListChecks, MapPin, MessageSquareText, Send, ShieldCheck, X } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Binoculars, Clock3, Flame, ListChecks, MapPin, MessageSquareText, Send, ShieldCheck, Trash2, X } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import ReportPhotos from "./ReportPhotos";
-import { Button } from "@/components/ui";
+import { Button, EvidenceUpload, FieldLength } from "@/components/ui";
+import { uploadPhoto } from "@/api/reports";
 import { useMutationAddReportUpdate, useQueryGetReport, useQueryGetReports } from "@/hooks/reports";
 import { privateError } from "@/lib";
-import type { DashboardUser, ObservationType, OwnReport } from "@/types";
+import { windSource } from "@/lib/wind";
+import type { DashboardUser, ObservationType, OwnReport, ReportPhoto } from "@/types";
 
 import ReportTimeline from "./ReportTimeline";
 
@@ -32,7 +34,7 @@ function locationText(report: Pick<OwnReport, "locationDescription" | "region" |
 function ForecastContext({ report }: { report: OwnReport }) {
   const wind = report.windContext;
   if (!report.case) return null;
-  return <section aria-label="Report area forecast" className="mt-6 border-t border-primary/10 pt-5"><h3 className="font-extrabold">BMKG forecast context</h3><p className="mt-2 text-sm">{wind?.summary ?? "Forecast context unavailable."}</p>{wind?.forecast && <dl className="mt-3 space-y-1 text-xs"><div><dt className="inline font-bold">Source: </dt><dd className="inline">BMKG forecast, not on-site measurement · {wind.forecast.regionName}</dd></div><div><dt className="inline font-bold">Issued: </dt><dd className="inline">{time(wind.forecast.issuedAt)}</dd></div><div><dt className="inline font-bold">Valid from: </dt><dd className="inline">{time(wind.forecast.validAt)}</dd></div><div><dt className="inline font-bold">Fetched: </dt><dd className="inline">{time(wind.forecast.fetchedAt)}</dd></div><div><dt className="inline font-bold">Wind: </dt><dd className="inline">{wind.windSpeedKmh === null ? "Unavailable" : `${wind.windSpeedKmh} km/h`}{wind.windFromDegrees === null ? " · direction unavailable" : ` · from ${wind.windFromDegrees}° toward ${wind.windToDegrees}°`}</dd></div></dl>}<p className="mt-3 text-xs text-muted-foreground">Potential impact unavailable: no verified geospatial downwind distance or settlement calculation. This is not a physical smoke or fire-spread perimeter, arrival-time prediction, evacuation notice, order, or confirmation.</p></section>;
+  return <section aria-label="Report area forecast" className="mt-6 border-t border-primary/10 pt-5"><h3 className="font-extrabold">Current wind context</h3><p className="mt-2 text-sm">{wind?.summary ?? "Forecast context unavailable."}</p>{wind?.forecast && <dl className="mt-3 space-y-1 text-xs"><div><dt className="inline font-bold">Source: </dt><dd className="inline">{windSource(wind.forecast)} · not an on-site measurement</dd></div>{wind.forecast.issuedAt && <div><dt className="inline font-bold">Issued: </dt><dd className="inline">{time(wind.forecast.issuedAt)}</dd></div>}<div><dt className="inline font-bold">Valid from: </dt><dd className="inline">{time(wind.forecast.validAt)}</dd></div><div><dt className="inline font-bold">Fetched: </dt><dd className="inline">{time(wind.forecast.fetchedAt)}</dd></div><div><dt className="inline font-bold">Wind: </dt><dd className="inline">{wind.windSpeedKmh === null ? "Unavailable" : `${wind.windSpeedKmh} km/h`}{wind.windFromDegrees === null ? " · direction unavailable" : ` · from ${wind.windFromDegrees}° toward ${wind.windToDegrees}°`}</dd></div></dl>}<p className="mt-3 text-xs text-muted-foreground">Potential impact unavailable: no verified geospatial downwind distance or settlement calculation. This is not a physical smoke or fire-spread perimeter, arrival-time prediction, evacuation notice, order, or confirmation.</p></section>;
 }
 
 function humanStatus(value: string) {
@@ -155,9 +157,28 @@ function ReportDetail({ user, id, onDraft, onClose }: { user: DashboardUser; id:
   const mutation = useMutationAddReportUpdate(user, id);
   const [message, setMessage] = useState("");
   const [uncertain, setUncertain] = useState(false);
+  const [photos, setPhotos] = useState<ReportPhoto[]>([]);
+  const [photoError, setPhotoError] = useState("");
+  const photoRef = useRef(photos);
   const report = query.isError ? undefined : query.data;
-  useEffect(() => { onDraft(!!message, mutation.isPending); }, [message, mutation.isPending, onDraft]);
-  useEffect(() => () => onDraft(false, false), [onDraft]);
+  useEffect(() => { photoRef.current = photos; }, [photos]);
+  useEffect(() => { onDraft(!!message || photos.length > 0, mutation.isPending); }, [message, photos.length, mutation.isPending, onDraft]);
+  useEffect(() => () => { photoRef.current.forEach(photo => URL.revokeObjectURL(photo.preview)); onDraft(false, false); }, [onDraft]);
+  async function submitFollowUp() {
+    const value = message.trim();
+    if (!value) return;
+    setPhotoError("");
+    try {
+      const ids: string[] = [];
+      for (let index = 0; index < photos.length; index++) {
+        const photo = photos[index];
+        ids.push(photo.id || await uploadPhoto(user, photo, values => setPhotos(current => current.map((item, position) => position === index ? { ...item, ...values } : item))));
+      }
+      await mutation.mutateAsync({ message: value, attachmentIds: ids });
+      photos.forEach(photo => URL.revokeObjectURL(photo.preview));
+      setPhotos([]); setMessage(""); setUncertain(false);
+    } catch { setPhotoError("Photo upload or follow-up submission failed. Your message and selected photos are retained."); }
+  }
 
   return <div className="flex min-h-0 flex-1 flex-col bg-white">
     <header className="flex shrink-0 items-center justify-between border-b border-primary/10 px-4 py-3"><Button asChild variant="ghost" className="rounded-sm"><Link to="/dashboard?panel=my-reports"><ArrowLeft size={16} aria-hidden="true" />My reports</Link></Button>{onClose && <button type="button" onClick={onClose} aria-label="Close report detail" className="grid size-11 place-items-center rounded-full text-muted-foreground hover:bg-secondary"><X size={19} aria-hidden="true" /></button>}</header>
@@ -167,17 +188,18 @@ function ReportDetail({ user, id, onDraft, onClose }: { user: DashboardUser; id:
       {report && <article>
         <div className="flex items-start justify-between gap-3"><div><h2 className="text-xl font-extrabold">Report details</h2><p className="mt-2 text-sm font-bold text-primary">{reportStatusLabel(report)}</p></div><span className="grid size-11 place-items-center rounded-sm bg-secondary text-primary"><ShieldCheck size={21} aria-hidden="true" /></span></div>
         <dl className="mt-6 divide-y divide-primary/10 border-y border-primary/10 text-sm">
-          <div className="py-5"><dt className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-widest text-muted-foreground"><img src="/icons8-smoke.png" width={24} height={24} alt="" aria-hidden="true" />Observations</dt><dd className="mt-3"><ObservationIcons types={report.observationTypes} /></dd><dd className="mt-3 whitespace-pre-wrap leading-6">{report.description}</dd></div>
+          <div className="py-5"><dt className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-widest text-muted-foreground"><Binoculars size={19} aria-hidden="true" />Observations</dt><dd className="mt-3"><ObservationIcons types={report.observationTypes} /></dd><dd className="mt-3 whitespace-pre-wrap leading-6">{report.description}</dd></div>
           <div className="py-5"><dt className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-widest text-muted-foreground"><Clock3 size={17} aria-hidden="true" />Time</dt><dd className="mt-2"><span className="font-bold">Observed</span> <time dateTime={report.observedAt}>{time(report.observedAt)}</time></dd><dd className="mt-1 text-muted-foreground"><span className="font-bold text-forest">Received</span> <time dateTime={report.createdAt}>{time(report.createdAt)}</time></dd></div>
           <div className="py-5"><dt className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-widest text-muted-foreground"><MapPin size={17} aria-hidden="true" />Location</dt><dd className="mt-2 font-bold">{locationMode(report)}</dd>{report.region?.name && <dd className="mt-1">{report.region.name}</dd>}<dd className="mt-1 whitespace-pre-wrap text-muted-foreground">{locationText(report)}</dd>{report.latitude !== null && report.longitude !== null && <dd className="mt-2 text-xs tabular-nums text-muted-foreground">Map point: {report.latitude.toFixed(5)}, {report.longitude.toFixed(5)}</dd>}</div>
           {report.case && <div className="py-5"><dt className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-widest text-muted-foreground"><ListChecks size={17} aria-hidden="true" />Current progress</dt><dd className="mt-2 font-bold">{humanStatus(report.case.verificationStatus)}</dd><dd className="mt-1 text-muted-foreground">{humanStatus(report.case.handlingStatus)}</dd></div>}
+          {report.case?.verificationStatus === "CONFIRMED_FIRE" && <div className="py-5"><dt className="font-bold">Confirmed fire boundary</dt><dd className="mt-2">{report.case.perimeter ? `${report.case.perimeter.areaHectares.toLocaleString("en", { maximumFractionDigits: 2 })} ha · Revision ${report.case.perimeter.revision}` : "Boundary not mapped. The report point is not a fire boundary."}</dd>{report.case.perimeter && <dd className="mt-1 text-muted-foreground">{report.case.perimeter.source} · {time(report.case.perimeter.observedAt)}</dd>}</div>}
         </dl>
         <p className="mt-4 text-xs leading-5 text-muted-foreground">Submission confirms receipt only, not a fire or response dispatch. If you need support, open this report from your account so the team can locate it securely.</p>
         {!!report.attachments.length && <section className="mt-6"><h3 className="flex items-center gap-2 font-extrabold"><img src="/icons8-photo.png" width={24} height={24} alt="" aria-hidden="true" />Private photos</h3><ReportPhotos user={user} reportId={report.id} photos={report.attachments} /></section>}
         <ForecastContext report={report} />
         <ReportTimeline report={report} user={user} />
-        {!!report.updates?.length && <section className="mt-6"><h3 className="flex items-center gap-2 font-extrabold"><MessageSquareText size={19} className="text-primary" aria-hidden="true" />Updates</h3><ol className="mt-3 divide-y divide-primary/10 border-y border-primary/10">{report.updates.map(update => <li key={update.id} className="py-4 text-sm"><p className="whitespace-pre-wrap leading-6">{update.message}</p><p className="mt-1 text-xs text-muted-foreground">{update.authorRole === "ADMIN" ? "Government reviewer" : "You"} · <time dateTime={update.createdAt}>{time(update.createdAt)}</time></p></li>)}</ol></section>}
-        <form className="mt-7 border-t border-primary/10 pt-6" onSubmit={async event => { event.preventDefault(); const value = message.trim(); if (!value) return; await mutation.mutateAsync(value); setMessage(""); setUncertain(false); }}><h3 className="flex items-center gap-2 font-extrabold"><MessageSquareText size={19} className="text-primary" aria-hidden="true" />Add factual follow-up</h3><label htmlFor="follow-up" className="mt-3 block text-sm font-bold">Message <span aria-hidden="true">*</span><textarea id="follow-up" required aria-required="true" minLength={3} maxLength={2000} rows={4} className="mt-2 w-full resize-none rounded-sm border bg-white p-3 text-sm" value={message} onChange={event => setMessage(event.target.value)} /></label><label className="mt-3 flex min-h-11 items-start gap-3 text-sm"><input type="checkbox" required aria-required="true" className="mt-1 size-4 accent-primary" checked={uncertain} onChange={event => setUncertain(event.target.checked)} /><span>I included uncertainty and did not claim unverified confirmation. <span aria-hidden="true">*</span></span></label>{mutation.isError && <p role="alert" className="mt-2 text-sm text-red-800">{privateError(mutation.error)}</p>}<Button disabled={!message.trim() || !uncertain || mutation.isPending} className="mt-4 w-full rounded-sm"><Send size={16} aria-hidden="true" />{mutation.isPending ? "Sending…" : "Send update"}</Button></form>
+        {!!report.updates?.length && <section className="mt-6"><h3 className="flex items-center gap-2 font-extrabold"><MessageSquareText size={19} className="text-primary" aria-hidden="true" />Updates</h3><ol className="mt-3 divide-y divide-primary/10 border-y border-primary/10">{report.updates.map(update => <li key={update.id} className="py-4 text-sm"><p className="whitespace-pre-wrap leading-6">{update.message}</p>{!!update.attachments?.length && <ReportPhotos user={user} reportId={report.id} photos={update.attachments} />}<p className="mt-1 text-xs text-muted-foreground">{update.authorRole === "ADMIN" ? "Government reviewer" : "You"} · <time dateTime={update.createdAt}>{time(update.createdAt)}</time></p></li>)}</ol></section>}
+        <form className="mt-7 border-t border-primary/10 pt-6" onSubmit={event => { event.preventDefault(); void submitFollowUp(); }}><h3 className="flex items-center gap-2 font-extrabold"><MessageSquareText size={19} className="text-primary" aria-hidden="true" />Add factual follow-up</h3><label htmlFor="follow-up" className="mt-3 block text-sm font-bold">Message <span aria-hidden="true">*</span><textarea id="follow-up" required aria-required="true" minLength={3} maxLength={2000} rows={4} className="mt-2 w-full resize-none rounded-sm border bg-white p-3 text-sm" value={message} onChange={event => setMessage(event.target.value)} /><FieldLength value={message} min={3} max={2000} /></label><div className="mt-4"><EvidenceUpload count={photos.length} disabled={mutation.isPending} error={photoError} onError={setPhotoError} onFiles={files => setPhotos(current => [...current, ...files.map(file => ({ file, preview: URL.createObjectURL(file), progress: 0 }))])} /></div>{!!photos.length && <ul className="mt-3 grid grid-cols-3 gap-2">{photos.map((photo, index) => <li key={photo.preview} className="relative h-20 overflow-hidden rounded-sm bg-secondary"><img src={photo.preview} alt={`Selected follow-up photo ${index + 1}`} className="size-full object-cover" /><button type="button" aria-label={`Remove follow-up photo ${index + 1}`} onClick={() => { URL.revokeObjectURL(photo.preview); setPhotos(current => current.filter((_, position) => position !== index)); }} className="absolute right-1 top-1 grid size-8 place-items-center rounded-full bg-forest/80 text-white"><Trash2 size={14} aria-hidden="true" /></button></li>)}</ul>}<label className="mt-3 flex min-h-11 items-start gap-3 text-sm"><input type="checkbox" required aria-required="true" className="mt-1 size-4 accent-primary" checked={uncertain} onChange={event => setUncertain(event.target.checked)} /><span>I included uncertainty and did not claim unverified confirmation. <span aria-hidden="true">*</span></span></label>{mutation.isError && <p role="alert" className="mt-2 text-sm text-red-800">{privateError(mutation.error)}</p>}<Button disabled={!message.trim() || !uncertain || mutation.isPending} className="mt-4 w-full rounded-sm"><Send size={16} aria-hidden="true" />{mutation.isPending ? "Sending…" : "Send update"}</Button></form>
       </article>}
     </div>
   </div>;

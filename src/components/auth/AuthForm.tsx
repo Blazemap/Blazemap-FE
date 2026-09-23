@@ -123,7 +123,7 @@ export function AuthForm({ mode, portal = "citizen" }: { mode: AuthMode; portal?
     <section aria-labelledby="auth-heading" className="auth-form">
       <h1 id="auth-heading" ref={headingRef} tabIndex={-1} className="text-[clamp(28px,3vw,38px)] font-extrabold leading-[1.12] tracking-[-0.035em]">{heading}</h1>
       {phase === "form" && <p className="mt-2 text-sm leading-6 text-muted-foreground">{isGovernment ? "For authorized government accounts only." : isRegister ? "Register as a citizen to get started." : "Login to your Blazemap account."}</p>}
-      {phase === "checking" && <div role="status" className="mt-6 flex items-center gap-3 text-sm text-muted-foreground"><LoaderCircle size={20} aria-hidden="true" className="motion-safe:animate-spin" />Verifying your account and access.</div>}
+      {phase === "checking" && <div role="status" aria-label="Verifying account access" className="mt-6 space-y-3 motion-safe:animate-pulse"><span className="sr-only">Verifying account access</span><div aria-hidden="true"><span className="block h-4 w-2/3 rounded bg-secondary" /><span className="mt-3 block h-11 w-full rounded-lg bg-secondary" /><span className="mt-3 block h-11 w-full rounded-lg bg-secondary/80" /></div></div>}
       {phase === "verification" && <><p className="mt-4 break-words text-sm font-bold">{verificationEmail}</p><p className="mt-3 text-sm leading-6 text-muted-foreground">{isRegister ? "If this address can be registered, check your inbox and spam folder for a verification link. Verify your email before logging in." : "Verify your email before logging in. Check your inbox and spam folder, or request a new link."}</p></>}
       {phase === "form" && (verificationError || verificationNotice) && <p className={`mt-3 text-xs leading-5 ${verificationError ? "text-red-700" : "text-muted-foreground"}`}>{verificationError || verificationNotice}</p>}
       <p ref={errorRef} role="alert" tabIndex={-1} className={error ? "mt-3 text-sm leading-5 text-red-800" : "sr-only"}>{error}</p>
@@ -133,7 +133,8 @@ export function AuthForm({ mode, portal = "citizen" }: { mode: AuthMode; portal?
           <Button type="button" variant="outline" onClick={() => { void startGoogle(); }} disabled={isPending || googleState !== "available"} aria-describedby={googleState !== "available" ? "google-availability" : undefined} className="mt-5 h-11 w-full rounded-lg bg-card font-bold text-black">
             <GoogleMark />Continue with Google
           </Button>
-          {googleState !== "available" && <p id="google-availability" className="mt-1 text-center text-xs leading-4 text-muted-foreground">{googleState === "checking" ? "Checking Google availability…" : "Google login is unavailable. Use email below."}</p>}
+          {googleState === "checking" && <div id="google-availability" role="status" aria-label="Checking Google availability" className="mt-2 motion-safe:animate-pulse"><span className="sr-only">Checking Google availability</span><span aria-hidden="true" className="mx-auto block h-3 w-40 rounded bg-secondary" /></div>}
+          {googleState === "unavailable" && <p id="google-availability" className="mt-1 text-center text-xs leading-4 text-muted-foreground">Google login is unavailable. Use email below.</p>}
           <div className="my-3 flex items-center gap-3 text-xs text-muted-foreground"><span className="h-px flex-1 bg-border" /><span>or continue with email</span><span className="h-px flex-1 bg-border" /></div>
           <form ref={formRef} method="post" noValidate onSubmit={handleSubmit}>
             <fieldset disabled={isPending} className="min-w-0 space-y-2">

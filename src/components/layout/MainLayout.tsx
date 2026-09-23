@@ -6,6 +6,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import type { DashboardUser } from "@/types";
 import { dashboardLogin, sameDashboardAccount } from "@/lib";
 import { workspacePath } from "@/lib/dashboard";
+import { pageTitle } from "@/lib/page-title";
 import SmoothScroll from "./SmoothScroll";
 import { Button } from "@/components/ui";
 import { useAccount, useMotionPreference } from "@/hooks";
@@ -25,7 +26,7 @@ const legalLinks = [
 ];
 
 export default function MainLayout({ accountUser }: { accountUser?: DashboardUser } = {}) {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const account = useAccount();
   const user = accountUser ?? (account.isError ? null : account.data);
   const isGuest = !accountUser && account.isSuccess && account.data === null;
@@ -57,7 +58,7 @@ export default function MainLayout({ accountUser }: { accountUser?: DashboardUse
     const description = activePath === "/vision-mission"
       ? "Blazemap's vision and mission for credible, traceable forest and land fire information in Kalimantan, guided by human verification."
       : activePath === "/faq"
-        ? "Answers about community observations, NASA FIRMS hotspots, BMKG forecasts, human verification, AI, privacy, and safety in Blazemap."
+        ? "Answers about community observations, NASA FIRMS hotspots, Google Weather conditions, human verification, AI, privacy, and safety in Blazemap."
         : activePath === "/contact"
           ? "Contact information for Blazemap, public channel availability, and guidance for forest and land fire observations in Kalimantan."
           : activePath === "/privacy"
@@ -65,11 +66,11 @@ export default function MainLayout({ accountUser }: { accountUser?: DashboardUse
             : activePath === "/terms"
               ? "Responsibilities, service limitations, and authority boundaries that apply when using Blazemap."
               : "Get to know Blazemap: forest and land fire awareness for Kalimantan, community observations, human verification, and guidance for staying safe.";
-    document.title = title;
+    document.title = accountUser ? pageTitle("/account") : pageTitle(activePath, search);
     document.querySelector('meta[name="description"]')?.setAttribute("content", description);
     document.querySelector('meta[property="og:title"]')?.setAttribute("content", title);
     document.querySelector('meta[property="og:description"]')?.setAttribute("content", description);
-  }, [activePath, accountUser]);
+  }, [activePath, accountUser, search]);
 
   useEffect(() => {
     if (!isMenuOpen) return;

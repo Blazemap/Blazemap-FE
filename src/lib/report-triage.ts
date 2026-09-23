@@ -4,6 +4,8 @@ export const triageAppearance = {
   CRITICAL: { label: "Critical", color: "#b91c1c", symbol: "!" },
   HIGH: { label: "High", color: "#9a3412", symbol: "!" },
   MEDIUM: { label: "Medium", color: "#1d4ed8", symbol: "M" },
+  LOW: { label: "Low", color: "#4b5563", symbol: "L" },
+  UNASSESSED: { label: "Needs assessment", color: "#4b5563", symbol: "?" },
   UNKNOWN: { label: "Needs assessment", color: "#4b5563", symbol: "?" },
 } as const;
 export const observationAppearance = {
@@ -39,6 +41,9 @@ const missing: Record<string, string> = {
   SETTLEMENT_GEOMETRY: "Some settlement boundaries could not be evaluated",
   TRUNCATED_CONTEXT: "Source results were limited; coverage cannot be treated as complete",
 };
+export function effectiveReportPriority(report: GovernmentReport) {
+  return report.case?.priority && report.case.priority !== "UNASSESSED" ? report.case.priority : report.triage.level;
+}
 export function triageReasons(triage: Triage): string {
   return triage.reasonCodes.length ? [...new Set(triage.reasonCodes.map(code => reasons[code] ?? "An additional server assessment reason has no readable explanation yet."))].join(" ") : "The server did not supply a priority explanation. Further assessment is needed.";
 }

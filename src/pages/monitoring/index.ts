@@ -1,9 +1,10 @@
 export { default, useMonitoringContext } from "./MonitoringPage";
 export { OverviewPage, ReportsPage, CasesPage, UsersPage } from "./MonitoringPages";
 export { ReportDetailPage, CaseDetailPage, UserDetailPage } from "./MonitoringDetails";
+export { GroupReportsPage } from "./GroupReportsPage";
 export { default as OperationsPage } from "./OperationsPage";
-export { default as OperationsTeamsPage } from "./OperationsTeamsPage";
-export { default as OperationsEquipmentPage } from "./OperationsEquipmentPage";
-export { default as OperationsAssignmentsPage } from "./OperationsAssignmentsPage";
-export { default as OperationsAccessWaterPage } from "./OperationsAccessWaterPage";
+export { default as OperationsTeamsPage, OperationsTeamDetailPage } from "./OperationsTeamsPage";
+export { default as OperationsEquipmentPage, OperationsEquipmentDetailPage } from "./OperationsEquipmentPage";
+export { default as OperationsAssignmentsPage, OperationsAssignmentDetailPage } from "./OperationsAssignmentsPage";
+export { default as OperationsAccessWaterPage, OperationsFeatureDetailPage } from "./OperationsAccessWaterPage";
 export { MonitoringErrorBoundary } from "./MonitoringErrorBoundary";

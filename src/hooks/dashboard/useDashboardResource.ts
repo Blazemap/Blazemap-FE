@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient, useQuery, type QueryKey } from "@tanstack/react-query";
-import { DashboardError, casesQueryOptions, mapQueryOptions, caseEvidenceQueryOptions, confirmCaseLocation, monitoringSummaryQueryOptions, sourceHealthQueryOptions, monitoringUsersQueryOptions, monitoringUserQueryOptions, monitoringOperationsQueryOptions, type MonitoringUserFilters } from "@/api/dashboard";
+import { DashboardError, casesQueryOptions, mapQueryOptions, caseEvidenceQueryOptions, confirmCaseLocation, monitoringSummaryQueryOptions, sourceHealthQueryOptions, monitoringUsersQueryOptions, monitoringUserQueryOptions, monitoringOperationsQueryOptions, monitoringTeamQueryOptions, monitoringEquipmentQueryOptions, monitoringAssignmentQueryOptions, monitoringFeatureQueryOptions, type MonitoringUserFilters } from "@/api/dashboard";
 import { dashboardRefreshMs } from "@/constants";
 import { AuthError, dashboardLogin } from "@/lib";
 import type { CaseFilters, DashboardUser } from "@/types";
@@ -42,8 +42,8 @@ export function useDashboardResource<T>(user: DashboardUser, queryKey: QueryKey,
     retry: () => { void query.refetch({ cancelRefetch: false }); },
   };
 }
-export function useQueryGetMap(user: DashboardUser, hours: number) {
-  const options = mapQueryOptions(user, hours);
+export function useQueryGetMap(user: DashboardUser, hours: number, caseStatus: "active" | "closed" | "all" = "active") {
+  const options = mapQueryOptions(user, hours, caseStatus);
   return useDashboardResource(user, options.queryKey, options.queryFn, true);
 }
 export function useCaseLocation(user: DashboardUser, id: string) {
@@ -96,3 +96,7 @@ export function useMonitoringOperations(user: DashboardUser) {
   const options = monitoringOperationsQueryOptions(user);
   return useDashboardResource(user, options.queryKey, options.queryFn, true, user.role === "ADMIN");
 }
+export function useMonitoringTeam(user: DashboardUser, id: string) { const options = monitoringTeamQueryOptions(user, id); return useDashboardResource(user, options.queryKey, options.queryFn, false, user.role === "ADMIN" && !!id); }
+export function useMonitoringEquipmentDetail(user: DashboardUser, id: string) { const options = monitoringEquipmentQueryOptions(user, id); return useDashboardResource(user, options.queryKey, options.queryFn, false, user.role === "ADMIN" && !!id); }
+export function useMonitoringAssignment(user: DashboardUser, id: string) { const options = monitoringAssignmentQueryOptions(user, id); return useDashboardResource(user, options.queryKey, options.queryFn, false, user.role === "ADMIN" && !!id); }
+export function useMonitoringFeature(user: DashboardUser, id: string) { const options = monitoringFeatureQueryOptions(user, id); return useDashboardResource(user, options.queryKey, options.queryFn, false, user.role === "ADMIN" && !!id); }

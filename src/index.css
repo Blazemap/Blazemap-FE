@@ -42,6 +42,22 @@
   ::selection { background: var(--color-sage); color: var(--color-forest); }
 }
 
+.rich-text-content { display: grid; gap: 1rem; color: var(--color-foreground); line-height: 1.75; }
+.rich-text-content h2 { margin-top: 0.75rem; font-size: 1.5rem; font-weight: 800; line-height: 1.25; letter-spacing: -0.025em; }
+.rich-text-content h3 { margin-top: 0.5rem; font-size: 1.15rem; font-weight: 800; line-height: 1.35; }
+.rich-text-content ul, .rich-text-content ol { display: grid; gap: 0.45rem; padding-left: 1.5rem; }
+.rich-text-content ul { list-style: disc; }
+.rich-text-content ol { list-style: decimal; }
+.rich-text-content blockquote { border-left: 3px solid var(--color-primary); background: var(--color-secondary); padding: 0.8rem 1rem; font-style: italic; }
+.rich-text-editor .ProseMirror { min-height: 18rem; padding: 1.25rem; line-height: 1.75; outline: none; }
+.rich-text-editor .ProseMirror p.is-editor-empty:first-child::before { float: left; height: 0; color: var(--color-muted-foreground); content: attr(data-placeholder); pointer-events: none; }
+.rich-text-editor .ProseMirror h2 { margin: 1.25rem 0 0.5rem; font-size: 1.5rem; font-weight: 800; line-height: 1.25; }
+.rich-text-editor .ProseMirror h3 { margin: 1rem 0 0.4rem; font-size: 1.15rem; font-weight: 800; line-height: 1.35; }
+.rich-text-editor .ProseMirror ul, .rich-text-editor .ProseMirror ol { margin: 0.75rem 0; padding-left: 1.5rem; }
+.rich-text-editor .ProseMirror ul { list-style: disc; }
+.rich-text-editor .ProseMirror ol { list-style: decimal; }
+.rich-text-editor .ProseMirror blockquote { margin: 1rem 0; border-left: 3px solid var(--color-primary); background: var(--color-secondary); padding: 0.8rem 1rem; }
+
 .scroll-reveal:focus-within {
   opacity: 1 !important;
   transform: none !important;
@@ -92,6 +108,21 @@
 @keyframes forest-mist {
   from { transform: translate3d(-3%, 0, 0); opacity: 0.3; }
   to { transform: translate3d(3%, -3%, 0); opacity: 0.5; }
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translate3d(24px, 0, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes toast-out {
+  from { opacity: 1; }
+  to { opacity: 0; transform: translate3d(12px, 0, 0); }
+}
+
+@keyframes toast-swipe-out {
+  from { transform: translateX(var(--radix-toast-swipe-end-x)); }
+  to { transform: translateX(calc(100% + 24px)); }
 }
 
 .not-found-scene {

@@ -30,7 +30,7 @@ export default function VisionMissionPage() {
 
   return (
     <div className="overflow-clip bg-background">
-      <section aria-labelledby="vision-title" className="relative isolate flex min-h-[calc(100svh-80px)] items-end overflow-hidden bg-[#173b2b] text-white lg:min-h-[calc(100svh-88px)]">
+      <section aria-labelledby="vision-title" className="relative isolate flex min-h-[calc(100svh-80px)] flex-col overflow-hidden bg-[#173b2b] text-white lg:min-h-[calc(100svh-88px)]">
         <motion.img
           src={rainforest}
           srcSet={`${rainforestSmall} 768w, ${rainforest} 1536w`}
@@ -54,19 +54,19 @@ export default function VisionMissionPage() {
           initial={isReducedMotion ? false : { opacity: 0, y: 28 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: isReducedMotion ? 0 : 0.8, ease: [0.16, 1, 0.3, 1] }}
-          className="mx-auto w-full max-w-[1440px] px-[clamp(24px,7vw,112px)] pb-16 pt-20 sm:pb-20 lg:pb-24"
+          className="mx-auto flex w-full max-w-[1440px] flex-1 flex-col justify-center px-[clamp(24px,7vw,112px)] py-16 sm:py-20 lg:py-24"
         >
           <h1 id="vision-title" className="max-w-[13ch] text-[clamp(48px,7vw,94px)] font-extrabold leading-[0.98] tracking-[-0.055em]">
             <span className="block">Clarity for every sign.</span>
-            <span className="mt-4 block leading-[1.2] text-white">Care for every forest.</span>
+            <span className="mt-2 block text-white">Care for every forest.</span>
           </h1>
           <p className="mt-7 max-w-[58ch] text-base leading-8 text-white/82 sm:text-lg">
             Our vision is a Kalimantan where forest and land fire information is credible, traceable, and useful. Communities and authorized teams can act with better context, not assumptions.
           </p>
-          <Button asChild size="lg" className="mt-8 bg-white font-bold text-forest hover:bg-sage">
-            <a href="#mission">Explore our mission <ArrowDown size={17} aria-hidden="true" /></a>
-          </Button>
         </motion.div>
+        <div className="relative z-10 mx-auto flex w-full max-w-[1440px] justify-end px-[clamp(24px,7vw,112px)] pb-5 text-xs font-semibold sm:pb-8">
+          <a href="#mission" className="inline-flex min-h-11 items-center gap-2 underline-offset-4 hover:underline">Explore our mission <ArrowDown size={15} aria-hidden="true" /></a>
+        </div>
 
         <img src={foreground} width={1000} height={667} alt="" aria-hidden="true" className="forest-foliage-edge pointer-events-none absolute -bottom-6 -right-40 -z-10 hidden h-[58%] w-auto -scale-x-100 object-contain opacity-55 lg:block" />
       </section>

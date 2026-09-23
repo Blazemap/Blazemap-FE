@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { changePassword, hasPassword, updateProfile } from "@/api/profile";
 import { passwordError } from "@/lib/auth";
+import { notifyToast } from "@/components/ui/toast";
 import type { PasswordValues } from "@/types";
 
 export function usePassword(user: DashboardUser, enabled: boolean) {
@@ -16,8 +17,9 @@ export function usePassword(user: DashboardUser, enabled: boolean) {
     if (lock.current) return false;
     lock.current = true; setPending(true); reset();
     try {
-      await changePassword(user, values);
-      setSuccess(true);
+       await changePassword(user, values);
+       setSuccess(true);
+       notifyToast({ title: "Password changed", tone: "success" });
       void client.invalidateQueries({ queryKey: queryKeys.account });
       void client.invalidateQueries({ queryKey: queryKeys.dashboard.session(user) });
       void client.invalidateQueries({ queryKey: queryKeys.dashboard.guard(user) });

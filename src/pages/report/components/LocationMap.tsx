@@ -4,7 +4,7 @@ import { mapStyleUrl } from "@/config/map";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Button } from "@/components/ui";
 
-export function LocationMap({ latitude, longitude, disabled, onPick }: { latitude: string; longitude: string; disabled: boolean; onPick: (latitude: string, longitude: string) => void }) {
+export function LocationMap({ latitude, longitude, disabled, onPick, label = "Choose a location on the map. Coordinate inputs provide a keyboard alternative." }: { latitude: string; longitude: string; disabled: boolean; onPick: (latitude: string, longitude: string) => void; label?: string }) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<Map | null>(null);
   const marker = useRef<Marker | null>(null);
@@ -37,5 +37,5 @@ export function LocationMap({ latitude, longitude, disabled, onPick }: { latitud
     marker.current.setLngLat([lng, lat]).addTo(map.current);
     map.current.jumpTo({ center: [lng, lat] });
   }, [latitude, longitude, attempt]);
-  return <div className="relative h-64 overflow-hidden rounded-xl bg-secondary lg:h-80"><div ref={container} className="h-full w-full" aria-label="Choose an observation location. Coordinate and region inputs below provide a keyboard alternative." />{failed && <div role="status" className="absolute left-3 right-14 top-3 rounded-lg bg-white/95 p-3 text-sm shadow"><p>Map unavailable. Enter coordinates or choose a region below.</p><Button type="button" variant="ghost" onClick={() => { setFailed(false); setAttempt(value => value + 1); }}>Retry map</Button></div>}</div>;
+  return <div className="relative h-64 overflow-hidden rounded-xl bg-secondary lg:h-80"><div ref={container} className="h-full w-full" aria-label={label} />{failed && <div role="status" className="absolute left-3 right-14 top-3 rounded-lg bg-white/95 p-3 text-sm shadow"><p>Map unavailable. Enter coordinates or choose a region below.</p><Button type="button" variant="ghost" onClick={() => { setFailed(false); setAttempt(value => value + 1); }}>Retry map</Button></div>}</div>;
 }

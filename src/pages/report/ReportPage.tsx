@@ -5,9 +5,9 @@ import { Dialog } from "radix-ui";
 import { Link, useLoaderData } from "react-router-dom";
 import { uploadPhoto } from "@/api/reports";
 import { DraftGuard } from "@/components/common";
-import { Button, FieldSelect } from "@/components/ui";
+import { Button, FieldLength, FieldSelect } from "@/components/ui";
 import { useMobileSheetResize } from "@/hooks";
-import { useMutationCreateReport, useQueryGetRegions } from "@/hooks/reports";
+import { useMutationCreateReport } from "@/hooks/reports";
 import { privateError, reportPayload, validatePhoto } from "@/lib";
 import type { DashboardUser, ObservationType, OwnReport, ReportDraft, ReportPayload, ReportPhoto } from "@/types";
 
@@ -28,7 +28,7 @@ type ReportPanelProps = {
 };
 
 const input = "mt-2 min-h-12 min-w-0 w-full rounded-sm border border-input bg-white px-4 py-3 text-sm font-semibold text-forest outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10";
-const initial: ReportDraft = { observationTypes: [], observedLocal: "", timeChoice: "", locationMode: "INCIDENT_ESTIMATE", latitude: "", longitude: "", confirmed: false, accuracyMeters: null, regionId: "", locationDescription: "", description: "" };
+const initial: ReportDraft = { observationTypes: [], observedLocal: "", timeChoice: "", locationMode: "INCIDENT_ESTIMATE", latitude: "", longitude: "", confirmed: false, accuracyMeters: null, description: "" };
 const spring = { type: "spring" as const, stiffness: 360, damping: 34 };
 
 function revealDetails(element: HTMLElement | null) {
@@ -41,9 +41,6 @@ export default function ReportPage({ open = true, onClose, onRestoreFocus, onPic
   const [draft, setDraft] = useState(initial);
   const [photos, setPhotos] = useState<ReportPhoto[]>([]);
   const photoRef = useRef(photos);
-  const [regionSearch, setRegionSearch] = useState("");
-  const [regionQuery, setRegionQuery] = useState("");
-  const regions = useQueryGetRegions(regionQuery);
   const mutation = useMutationCreateReport(user);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -76,14 +73,14 @@ export default function ReportPage({ open = true, onClose, onRestoreFocus, onPic
   useEffect(() => { onDraft?.(dirty && !receipt, busy); }, [busy, dirty, onDraft, receipt]);
   useEffect(() => { onLocationChange?.(receipt || !hasCoordinates ? null : { latitude: draft.latitude, longitude: draft.longitude, locationMode: draft.locationMode }); }, [draft.latitude, draft.locationMode, draft.longitude, hasCoordinates, onLocationChange, receipt]);
   useEffect(() => () => onDraft?.(false, false), [onDraft]);
-  useEffect(() => { if (gps || (!hasCoordinates && regions.isError)) revealDetails(locationRef.current); }, [gps, hasCoordinates, regions.isError]);
+  useEffect(() => { if (gps) revealDetails(locationRef.current); }, [gps]);
 
   function newReport() {
     if (!receipt || pending.current) return;
     cancelLocation();
     for (const photo of photoRef.current) URL.revokeObjectURL(photo.preview);
     photoRef.current = [];
-    setPhotos([]); setDraft(initial); setRegionSearch(""); setRegionQuery("");
+    setPhotos([]); setDraft(initial);
     setReview(null); setReceipt(null); setAttempted(false); setDirty(false); setError("");
     submissionKey.current = crypto.randomUUID();
     mutation.reset();
@@ -136,7 +133,7 @@ export default function ReportPage({ open = true, onClose, onRestoreFocus, onPic
   }
   function locate() {
     if (pending.current || review) return;
-    if (!navigator.geolocation) { setGps("Location is not supported. Pick a point or select a region."); return; }
+    if (!navigator.geolocation) { setGps("Location is not supported. Choose a point on the map."); return; }
     const request = ++locationRequest.current;
     setGps("Finding your location…");
     navigator.geolocation.getCurrentPosition(position => {
@@ -145,7 +142,7 @@ export default function ReportPage({ open = true, onClose, onRestoreFocus, onPic
       setGps(`Observer position found · about ${Math.round(position.coords.accuracy)} m accuracy.`);
     }, () => {
       if (request !== locationRequest.current || pending.current) return;
-      setGps("Location unavailable. Pick a point or use a verified region.");
+      setGps("Location unavailable. Choose a point on the map.");
     }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
   }
 
@@ -169,7 +166,7 @@ export default function ReportPage({ open = true, onClose, onRestoreFocus, onPic
 
               <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-white">
                 {error && <p id="report-error" ref={errorRef} tabIndex={-1} role="alert" className="mx-7 mb-4 rounded-sm bg-red-50 p-4 text-sm text-red-900">{error}</p>}
-                {receipt ? <section className="px-7 py-8"><div className="grid size-14 place-items-center rounded-full bg-emerald-50 text-emerald-700"><Check size={26} strokeWidth={3} aria-hidden="true" /></div><h2 className="mt-5 text-2xl font-extrabold">Report received</h2><p className="mt-3 text-sm leading-6 text-muted-foreground">You can track its review status in My reports. Submission confirms receipt only, not a fire or dispatch.</p><Button asChild className="mt-6 w-full rounded-sm"><Link to={`/dashboard?panel=my-reports&report=${encodeURIComponent(receipt.id)}`}>View report</Link></Button><Button type="button" variant="outline" className="mt-3 w-full rounded-sm" disabled={busy} onClick={newReport}>New report</Button></section> : review ? <ReviewReport review={review} regionName={regions.data?.find(region => region.id === review.regionId)?.name} attempted={attempted} /> : <form id="new-report-form" onInvalidCapture={event => revealDetails(event.target as HTMLElement)} onSubmit={event => { event.preventDefault(); void prepare(); }} aria-describedby={error ? "report-error" : undefined}>
+                {receipt ? <section className="px-7 py-8"><div className="grid size-14 place-items-center rounded-full bg-emerald-50 text-emerald-700"><Check size={26} strokeWidth={3} aria-hidden="true" /></div><h2 className="mt-5 text-2xl font-extrabold">Report received</h2><p className="mt-3 text-sm leading-6 text-muted-foreground">You can track its review status in My reports. Submission confirms receipt only, not a fire or dispatch.</p><Button asChild className="mt-6 w-full rounded-sm"><Link to={`/dashboard?panel=my-reports&report=${encodeURIComponent(receipt.id)}`}>View report</Link></Button><Button type="button" variant="outline" className="mt-3 w-full rounded-sm" disabled={busy} onClick={newReport}>New report</Button></section> : review ? <ReviewReport review={review} attempted={attempted} /> : <form id="new-report-form" onInvalidCapture={event => revealDetails(event.target as HTMLElement)} onSubmit={event => { event.preventDefault(); void prepare(); }} aria-describedby={error ? "report-error" : undefined}>
                   <fieldset disabled={busy} className="min-w-0">
                     <details ref={observationRef} open className="border-t border-primary/10 px-7 py-4">
                       <summary className="min-h-11 cursor-pointer py-3 text-sm font-bold focus-visible:outline-2 focus-visible:outline-primary">Observation{draft.observationTypes.length > 0 && ` · ${draft.observationTypes.map(type => type.replaceAll("_", " ").toLowerCase()).join(", ")}`}</summary>
@@ -178,27 +175,16 @@ export default function ReportPage({ open = true, onClose, onRestoreFocus, onPic
                       {draft.timeChoice === "NOW" && <p className="text-xs text-muted-foreground">Observing now. Time is recorded when you review.</p>}
                       {draft.timeChoice === "EARLIER" && <label htmlFor="observed-at" className="mt-2 block text-sm font-bold">Date and time ({Intl.DateTimeFormat().resolvedOptions().timeZone}) <span aria-hidden="true">*</span><input id="observed-at" type="datetime-local" required aria-required="true" value={draft.observedLocal} className={input} onChange={event => change({ observedLocal: event.target.value })} /></label>}
                       <label htmlFor="description" className="mt-4 block text-sm font-bold">What happened?<span className="text-accent" aria-hidden="true"> *</span><textarea id="description" required aria-required="true" minLength={5} maxLength={2000} rows={3} value={draft.description} aria-describedby="description-help" className={`${input} resize-y leading-6`} placeholder="Describe what you saw or smelled…" onChange={event => change({ description: event.target.value })} /></label>
-                      <p id="description-help" className="mt-1 text-xs text-muted-foreground">5–2,000 characters. Report only what you observed.</p>
+                      <p id="description-help" className="mt-1 text-xs text-muted-foreground">Report only what you observed.</p><FieldLength value={draft.description} min={5} max={2000} />
                     </details>
 
                     <details ref={locationRef} open className="border-t border-primary/10 px-7 py-4">
-                      <summary className="min-h-11 cursor-pointer py-3 text-sm font-bold focus-visible:outline-2 focus-visible:outline-primary">Location{hasCoordinates ? " · Map point selected" : draft.regionId ? " · Region selected" : ""}{(hasCoordinates || draft.regionId) && !draft.confirmed && " · Confirmation needed"}</summary>
+                      <summary className="min-h-11 cursor-pointer py-3 text-sm font-bold focus-visible:outline-2 focus-visible:outline-primary">Location{hasCoordinates ? " · Map point selected" : ""}{hasCoordinates && !draft.confirmed && " · Confirmation needed"}</summary>
                       <label htmlFor="location-mode" className="mt-5 block text-sm font-bold">Point represents <span aria-hidden="true">*</span><FieldSelect id="location-mode" required value={draft.locationMode} onValueChange={value => change({ locationMode: value as ReportDraft["locationMode"] }, true)} options={[{ value: "INCIDENT_ESTIMATE", label: "Estimated incident location" }, { value: "OBSERVER_POSITION", label: "Observer position" }]} /></label>
                       <div className="mt-4 flex items-center justify-between gap-3 py-2"><div className="flex min-w-0 items-center gap-3"><MapPin className="shrink-0 text-primary" size={22} strokeWidth={2.5} aria-hidden="true" /><div className="min-w-0"><p className="text-xs font-bold text-muted-foreground">Selected location</p><p className="mt-0.5 truncate font-mono text-xs font-bold text-forest">{hasCoordinates ? `${Number(draft.latitude).toFixed(5)}, ${Number(draft.longitude).toFixed(5)}` : "No precise point selected"}</p></div></div><div className="flex shrink-0"><button type="button" disabled={!onPick} onClick={() => { cancelLocation(); onPick?.({ latitude: draft.latitude, longitude: draft.longitude, locationMode: draft.locationMode, receive: (latitude, longitude) => { change({ latitude, longitude, accuracyMeters: null }, true); revealDetails(locationRef.current); } }); }} className="min-h-11 px-2 text-xs font-extrabold uppercase tracking-wide text-primary hover:text-forest disabled:opacity-50">{hasCoordinates ? "Change" : "Choose"}</button>{hasCoordinates && <button type="button" onClick={() => change({ latitude: "", longitude: "", accuracyMeters: null }, true)} className="min-h-11 px-2 text-xs font-extrabold uppercase tracking-wide text-red-800 hover:text-red-950">Clear</button>}</div></div>
                       <button type="button" aria-describedby={gps ? "gps-status" : undefined} onClick={locate} className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-sm border-2 border-primary text-xs font-extrabold uppercase tracking-widest text-primary transition-colors hover:bg-primary hover:text-white"><Navigation size={16} strokeWidth={2.5} aria-hidden="true" />Use my GPS location</button>
                       {gps && <p id="gps-status" role="status" className="mt-2 text-xs leading-5 text-muted-foreground">{gps}</p>}
-                      {!hasCoordinates && <details className="mt-4" open>
-                        <summary className="min-h-11 cursor-pointer py-3 text-sm font-bold focus-visible:outline-2 focus-visible:outline-primary">No map point? Select a region</summary>
-                        <label htmlFor="region" className="mt-2 block text-sm font-bold">Region{!hasCoordinates && <span aria-hidden="true"> *</span>}<select id="region" required={!hasCoordinates} aria-required={!hasCoordinates} className={input} value={draft.regionId} onInvalid={event => { const details = event.currentTarget.closest("details"); if (details) details.open = true; }} onChange={event => change({ regionId: event.target.value }, true)}><option value="">Select a verified region</option>{regions.data?.map(region => <option key={region.id} value={region.id}>{region.name} · {region.code}</option>)}</select></label>
-                        <details className="mt-2">
-                          <summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-primary">Search other regions</summary>
-                          <label htmlFor="region-search" className="block text-sm font-bold">Region name<input id="region-search" value={regionSearch} maxLength={200} className={input} placeholder="Search a region…" onChange={event => setRegionSearch(event.target.value)} /></label>
-                          <Button type="button" variant="outline" className="mt-2 min-h-11 rounded-sm px-4 text-xs" onClick={() => { setRegionQuery(regionSearch.trim()); if (regionSearch.trim() === regionQuery) void regions.refetch(); }}>Search regions</Button>
-                        </details>
-                      </details>}
-                      {!hasCoordinates && (regions.isError ? <div role="alert" className="mt-2 text-sm text-red-800">Regions could not load. Retry or choose a map point.<Button type="button" variant="outline" className="mt-2 min-h-11 rounded-sm" onClick={() => void regions.refetch()}>Retry regions</Button></div> : regions.data?.length === 0 ? <p role="status" className="mt-2 text-sm text-muted-foreground">No verified regions match. Search another name or choose a map point.</p> : null)}
-                      <label htmlFor="landmark" className="mt-4 block text-sm font-bold">{hasCoordinates ? "Landmark or direction (optional)" : <>Describe the location <span aria-hidden="true">*</span></>}<textarea id="landmark" required={!hasCoordinates} aria-required={!hasCoordinates} minLength={hasCoordinates ? undefined : 5} maxLength={1000} rows={2} aria-describedby="landmark-help" className={`${input} resize-y leading-6`} value={draft.locationDescription} onChange={event => change({ locationDescription: event.target.value }, true)} /></label>
-                      <p id="landmark-help" className="mt-1 text-xs text-muted-foreground">{hasCoordinates ? "Add a landmark or uncertainty if helpful. Up to 1,000 characters." : "Include a landmark or direction within the region. 5–1,000 characters."}</p>
+                      {!hasCoordinates && <p role="status" className="mt-4 rounded-sm bg-secondary/50 p-3 text-xs leading-5 text-muted-foreground">Choose a precise point on the map or use your GPS location before continuing.</p>}
                       <label className="mt-4 flex min-h-11 items-start gap-3 text-sm font-semibold"><input type="checkbox" required aria-required="true" checked={draft.confirmed} className="mt-1 size-4 shrink-0 accent-primary" onChange={event => change({ confirmed: event.target.checked })} /><span>I confirm this {draft.locationMode === "OBSERVER_POSITION" ? "observer position" : "estimated incident location"}. <span aria-hidden="true">*</span></span></label>
                     </details>
 
@@ -230,6 +216,6 @@ function SectionLabel({ icon: Icon, color, title, id, suffix }: { icon: typeof F
   return <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><span className={`grid size-10 place-items-center rounded-sm ${color}`}><Icon size={20} strokeWidth={2.4} aria-hidden="true" /></span><h2 id={id} className="text-base font-extrabold">{title}</h2></div>{suffix && <span className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">{suffix}</span>}</div>;
 }
 
-function ReviewReport({ review, regionName, attempted }: { review: ReportPayload; regionName?: string; attempted: boolean }) {
-  return <section className="divide-y divide-primary/10 border-t border-primary/10"><div className="px-7 py-6"><SectionLabel icon={Check} color="bg-emerald-50 text-emerald-700" title="Review your report" id="review-heading" /></div><dl className="divide-y divide-primary/10 text-sm"><div className="px-7 py-5"><dt className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-widest text-muted-foreground"><Clock3 size={15} aria-hidden="true" />Observed</dt><dd className="mt-2 font-semibold">{review.observationTypes.map(type => type.replaceAll("_", " ").toLowerCase()).join(", ")} · {new Date(review.observedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</dd></div><div className="px-7 py-5"><dt className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-widest text-muted-foreground"><Crosshair size={15} aria-hidden="true" />Location</dt><dd className="mt-2 font-semibold">{review.locationMode === "OBSERVER_POSITION" ? "Observer position" : "Estimated incident location"}{review.latitude !== null ? ` · ${review.latitude}, ${review.longitude}` : " · Region only"}</dd>{regionName && <dd className="mt-1">{regionName}</dd>}{review.locationDescription && <dd className="mt-1 whitespace-pre-wrap text-muted-foreground">{review.locationDescription}</dd>}</div><div className="px-7 py-5"><dt className="text-xs font-extrabold uppercase tracking-widest text-muted-foreground">Description</dt><dd className="mt-2 whitespace-pre-wrap leading-6">{review.description}</dd></div>{review.attachmentIds.length > 0 && <div className="px-7 py-3"><dt className="text-xs font-extrabold uppercase tracking-widest text-muted-foreground">Private photos</dt><dd className="mt-2">{review.attachmentIds.length} attached</dd></div>}</dl>{attempted && <p className="mx-7 mb-5 rounded-sm bg-amber-50 p-3 text-xs leading-5 text-amber-950">Retry this unchanged report if the response was lost. The submission key prevents duplicates.</p>}</section>;
+function ReviewReport({ review, attempted }: { review: ReportPayload; attempted: boolean }) {
+  return <section className="divide-y divide-primary/10 border-t border-primary/10"><div className="px-7 py-6"><SectionLabel icon={Check} color="bg-emerald-50 text-emerald-700" title="Review your report" id="review-heading" /></div><dl className="divide-y divide-primary/10 text-sm"><div className="px-7 py-5"><dt className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-widest text-muted-foreground"><Clock3 size={15} aria-hidden="true" />Observed</dt><dd className="mt-2 font-semibold">{review.observationTypes.map(type => type.replaceAll("_", " ").toLowerCase()).join(", ")} · {new Date(review.observedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</dd></div><div className="px-7 py-5"><dt className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-widest text-muted-foreground"><Crosshair size={15} aria-hidden="true" />Location</dt><dd className="mt-2 font-semibold">{review.locationMode === "OBSERVER_POSITION" ? "Observer position" : "Estimated incident location"} · {review.latitude}, {review.longitude}</dd></div><div className="px-7 py-5"><dt className="text-xs font-extrabold uppercase tracking-widest text-muted-foreground">Description</dt><dd className="mt-2 whitespace-pre-wrap leading-6">{review.description}</dd></div>{review.attachmentIds.length > 0 && <div className="px-7 py-3"><dt className="text-xs font-extrabold uppercase tracking-widest text-muted-foreground">Private photos</dt><dd className="mt-2">{review.attachmentIds.length} attached</dd></div>}</dl>{attempted && <p className="mx-7 mb-5 rounded-sm bg-amber-50 p-3 text-xs leading-5 text-amber-950">Retry this unchanged report if the response was lost. The submission key prevents duplicates.</p>}</section>;
 }

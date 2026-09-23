@@ -5,7 +5,8 @@ import WarningBanner from "./WarningBanner";
 import { usePublicationMap } from "@/hooks/dashboard/usePublicationMap";
 import MapLayers from "./MapLayers";
 import { Check, Crosshair, ListFilter, Plus, X } from "lucide-react";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
+import { pageTitle } from "@/lib/page-title";
 import { WorkspaceNav } from "@/components/common";
 import { hotspotConfidence, hotspotFrp } from "@/pages/dashboard/utils/map";
 import PublicPerimeterDetail from "./PublicPerimeterDetail";
@@ -16,7 +17,7 @@ import { useMobileSheetResize } from "@/hooks";
 import { useQueryGetMap } from "@/hooks/dashboard";
 import ReportPage from "@/pages/report";
 import ReportsPage from "@/pages/reports";
-import { MapSkeleton, PlaceSearch } from "@/pages/dashboard/components";
+import { MapSkeleton, PlaceSearch, PublishedLocationSkeleton } from "@/pages/dashboard/components";
 import { ageMap, filterMap, formatTime, hasPoint, mapAvailability } from "@/pages/dashboard/utils";
 import type { DashboardUser, MapItem, ReportDraft } from "@/types";
 
@@ -25,7 +26,9 @@ const reportsSpring = { type: "spring" as const, stiffness: 300, damping: 30 };
 
 export function CitizenDashboard({ user }: { user: DashboardUser }) {
   const reducedMotion = useReducedMotion();
+  const location = useLocation();
   const [params, setParams] = useSearchParams();
+  useEffect(() => { document.title = pageTitle(location.pathname, location.search); }, [location.pathname, location.search]);
   const news = params.get("view") === "news";
   const feed = params.get("view") === "feed";
   const reportOpen = params.get("panel") === "report";
@@ -52,10 +55,18 @@ export function CitizenDashboard({ user }: { user: DashboardUser }) {
   const feedItems = useMemo(() => filterMap(data?.items ?? [], "", true, false), [data?.items]);
   const publication = usePublicationMap(user, params.get("publication"));
   const baseItems = feed ? feedItems : mapItems;
-  const items = publication.item && publications ? [...baseItems.filter(item => item.id !== publication.item!.id), publication.item] : baseItems;
-  const selected = (publications ? publication.item : null) ?? items.find(item => item.id === params.get("observation")) ?? null;
+  const ownCaseNumbers = new Set(ownReports.flatMap(report => report.case ? [report.case.number] : []));
+  const items = (publication.item && publications ? [...baseItems.filter(item => item.id !== publication.item!.id), publication.item] : baseItems).filter(item => !item.caseNumber || !ownCaseNumbers.has(item.caseNumber));
+  const selected = items.find(item => item.id === (publications ? publication.item?.id : null)) ?? items.find(item => item.id === params.get("observation")) ?? null;
   const selectedOwnReport = ownReports.find(report => report.id === params.get("report")) ?? null;
   const availability = mapAvailability(data, loaded.failed);
+  const [showInitialAvailability, setShowInitialAvailability] = useState(true);
+
+  useEffect(() => {
+    if (loaded.initialLoading || loaded.failed || !showInitialAvailability) return;
+    const timeout = window.setTimeout(() => setShowInitialAvailability(false), 5000);
+    return () => window.clearTimeout(timeout);
+  }, [loaded.initialLoading, loaded.failed, showInitialAvailability]);
 
   useEffect(() => {
     const media = window.matchMedia("(min-width: 768px)");
@@ -124,20 +135,21 @@ export function CitizenDashboard({ user }: { user: DashboardUser }) {
 
   const searchControl = (id: string, side: "top" | "bottom") => <PlaceSearch id={id} side={side} onSelect={value => { if (pick || reportPending) return; setPlace(value); updateParams(next => next.delete("view")); }} />;
   const controls = <><div className="h-5 w-px shrink-0 bg-primary/10" />{filterControl}<div className="h-5 w-px shrink-0 bg-primary/10" /><button type="button" data-reports-trigger aria-label="My reports" aria-pressed={myReportsOpen} onClick={toggleMyReports} className={`flex min-h-10 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-extrabold transition-colors ${myReportsOpen ? "bg-primary text-white shadow-sm" : "text-muted-foreground hover:bg-secondary hover:text-forest"}`}><ListFilter size={16} aria-hidden="true" /><span className="hidden sm:inline">My reports</span></button><div className="h-5 w-px shrink-0 bg-primary/10" /><button type="button" data-report-trigger aria-label={reportOpen ? "Close report" : "Create report"} aria-pressed={reportOpen} disabled={reportPending} onClick={openReport} className={`flex min-h-10 items-center justify-center gap-1.5 rounded-full px-3.5 text-xs font-extrabold text-white shadow-sm transition-colors disabled:opacity-50 ${reportOpen ? "bg-forest" : "bg-primary hover:bg-forest"}`}>{reportOpen ? <X size={16} aria-hidden="true" /> : <Plus size={16} strokeWidth={2.5} aria-hidden="true" />}<span className="hidden sm:inline">{reportOpen ? "Close" : "Report"}</span></button></>;
-  const mobileControls = <div className="space-y-2"><div className="flex h-10 items-center rounded-full bg-secondary/50 px-1.5 shadow-inner">{searchControl("mobile-dashboard-search", "bottom")}</div><div className="grid grid-cols-3 gap-1.5"><span className="flex min-w-0 justify-center">{filterControl}</span><button type="button" data-reports-trigger aria-label="My reports" aria-pressed={myReportsOpen} onClick={toggleMyReports} className={`flex min-h-9 items-center justify-center gap-1.5 rounded-full px-2 text-[10px] font-extrabold ${myReportsOpen ? "bg-primary text-white" : "border border-primary/10 bg-white text-muted-foreground"}`}><ListFilter size={15} aria-hidden="true" />Reports</button><button type="button" data-report-trigger aria-label={reportOpen ? "Close report" : "Create report"} aria-pressed={reportOpen} disabled={reportPending} onClick={openReport} className={`flex min-h-9 items-center justify-center gap-1.5 rounded-full px-2 text-[10px] font-extrabold text-white ${reportOpen ? "bg-forest" : "bg-primary"}`}>{reportOpen ? <X size={15} aria-hidden="true" /> : <Plus size={15} aria-hidden="true" />}{reportOpen ? "Close" : "Report"}</button></div></div>;
+  const mobileControls = <div className="space-y-2"><div className="flex h-10 items-center rounded-full bg-secondary/50 px-1.5 shadow-inner">{searchControl("mobile-dashboard-search", "bottom")}</div><div className="grid grid-cols-3 gap-1.5"><span className="flex min-w-0 justify-center">{filterControl}</span><button type="button" data-reports-trigger aria-label="My reports" aria-pressed={myReportsOpen} onClick={toggleMyReports} className={`flex min-h-9 items-center justify-center gap-1.5 rounded-full px-2 text-[10px] font-extrabold ${myReportsOpen ? "bg-primary text-white" : "text-muted-foreground hover:bg-secondary"}`}><ListFilter size={15} aria-hidden="true" />Reports</button><button type="button" data-report-trigger aria-label={reportOpen ? "Close report" : "Create report"} aria-pressed={reportOpen} disabled={reportPending} onClick={openReport} className={`flex min-h-9 items-center justify-center gap-1.5 rounded-full px-2 text-[10px] font-extrabold text-white ${reportOpen ? "bg-forest" : "bg-primary"}`}>{reportOpen ? <X size={15} aria-hidden="true" /> : <Plus size={15} aria-hidden="true" />}{reportOpen ? "Close" : "Report"}</button></div></div>;
 
   if (news) return <main className="relative h-dvh overflow-hidden bg-white text-forest"><WorkspaceNav user={user} /><NewsFeed user={user} /></main>;
   return <main className="relative isolate h-dvh overflow-hidden bg-secondary/40 text-forest">
     <h1 className="sr-only">{feed ? "Published updates" : "Blazemap dashboard"}</h1>
     <WorkspaceNav user={user}>{mobileControls}</WorkspaceNav>
 
-    {!feed && <section aria-label="Situation map" className="absolute inset-0"><Suspense fallback={<MapSkeleton />}><SituationMap place={place} items={items} selected={selected} draftLocation={pick ?? reportLocation} onSelect={selectItem} onPick={pick ? (latitude, longitude) => setPick(current => current ? { ...current, latitude, longitude } : null) : undefined} ownReports={publications ? ownReports : []} selectedOwnReport={selectedOwnReport} onSelectOwnReport={selectOwnReport} /></Suspense></section>}
+    {!feed && <section aria-label="Situation map" className="absolute inset-0">{loaded.initialLoading && !loaded.data ? <MapSkeleton /> : <Suspense fallback={<MapSkeleton />}><SituationMap place={place} items={items} selected={selected} draftLocation={pick ?? reportLocation} onSelect={selectItem} onPick={pick ? (latitude, longitude) => setPick(current => current ? { ...current, latitude, longitude } : null) : undefined} ownReports={publications ? ownReports : []} selectedOwnReport={selectedOwnReport} onSelectOwnReport={selectOwnReport} /></Suspense>}</section>}
 
     {feed && <NewsFeed key={hours} user={user} news={false} hours={hours} />}
     {!feed && !pick && !reportOpen && !myReportsOpen && !selected && <div className="absolute bottom-24 right-4 z-20 w-[min(360px,calc(100%-32px))]"><WarningBanner user={user} /></div>}
 
-    {!feed && params.get("publication") && (publication.isPending || publication.isError || !publication.item) && <div role={publication.isError ? "alert" : "status"} className="absolute left-4 top-56 z-20 rounded-sm border bg-white p-4 text-sm sm:top-28">{publication.isPending ? "Loading published location…" : "Approved map location unavailable."}{publication.isError && <Button variant="outline" onClick={() => void publication.refetch()}>Retry</Button>}</div>}
-    {!feed && availability && <p role={loaded.failed ? "alert" : "status"} className="absolute left-4 top-56 z-10 max-w-xs rounded-sm border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-950 sm:left-6 sm:top-28">{availability}</p>}
+    {!feed && params.get("publication") && publication.isPending && !publication.item && <PublishedLocationSkeleton />}
+    {!feed && params.get("publication") && publication.isError && !publication.item && <div role="alert" className="absolute left-4 top-56 z-20 rounded-sm border bg-white p-4 text-sm sm:top-28">Approved map location unavailable.<Button variant="outline" onClick={() => void publication.refetch()}>Retry</Button></div>}
+    {!feed && availability && (loaded.failed || showInitialAvailability) && <p role={loaded.failed ? "alert" : "status"} className="absolute left-4 top-56 z-10 max-w-xs rounded-sm border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-950 sm:left-6 sm:top-28">{availability}</p>}
     <div className="absolute bottom-5 left-1/2 z-30 hidden w-full max-w-[520px] -translate-x-1/2 md:max-w-[700px] items-center gap-1 rounded-full border border-primary/10 bg-white px-2 py-1.5 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.18)] sm:flex">{searchControl("dashboard-search", "top")}{controls}</div>
 
     <AnimatePresence>

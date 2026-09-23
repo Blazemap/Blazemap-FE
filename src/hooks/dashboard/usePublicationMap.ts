@@ -4,8 +4,8 @@ import type { DashboardUser, MapItem } from "@/types";
 
 export function usePublicationMap(user: DashboardUser, slug: string | null) {
   const query = usePublication(user, slug);
-  const publication = query.isError ? null : query.data;
-  const item: MapItem | null = publication && publicationHasMap(publication) ? {
+  const publication = query.data ?? null;
+  const item: MapItem | null = publication && publication.activeMapEligible === true && publicationHasMap(publication) ? {
     id: `publication:${publication.id}`, kind: "publication", title: publication.title,
     latitude: publication.latitude, longitude: publication.longitude, time: publication.publishedAt,
     source: "Published case summary", location: publication.regions.map(region => region.name).join(", ") || "Approved incident location",

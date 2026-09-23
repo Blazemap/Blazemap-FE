@@ -42,6 +42,27 @@ export function GovernmentReportDetailSkeleton() {
   </section>;
 }
 
+export function GovernmentCaseDetailSkeleton() {
+  return <div role="status" aria-label="Loading case details" className="mt-4 space-y-5 motion-safe:animate-pulse">
+    <span className="sr-only">Loading case details</span>
+    <div aria-hidden="true" className="space-y-4">
+      <span className="block h-3 w-40 rounded-full bg-secondary" />
+      <div className="space-y-3">{Array.from({ length: 4 }, (_, index) => <div key={index}><span className="block h-3 w-28 rounded-full bg-secondary/80" /><span className="mt-2 block h-4 w-3/4 rounded-full bg-secondary" /></div>)}</div>
+      {Array.from({ length: 4 }, (_, index) => <section key={index} className="space-y-3 border-t pt-4"><span className="block h-5 w-40 rounded-full bg-secondary" /><span className="block h-3 w-full rounded-full bg-secondary/80" /><span className="block h-11 w-full rounded-lg bg-secondary" /></section>)}
+    </div>
+  </div>;
+}
+
+export function PublishedLocationSkeleton() {
+  return <div role="status" aria-label="Loading published location" className="absolute left-4 top-56 z-20 w-56 space-y-2 rounded-sm border bg-white p-4 shadow-lg motion-safe:animate-pulse sm:top-28"><span className="sr-only">Loading published location</span><div aria-hidden="true"><span className="block h-4 w-32 rounded bg-secondary" /><span className="mt-2 block h-3 w-full rounded bg-secondary/80" /></div></div>;
+}
+export function CompletionNewsSkeleton() {
+  return <section role="status" aria-label="Loading completion News" className="mt-5 rounded-xl border border-primary/15 bg-secondary/20 p-5 motion-safe:animate-pulse"><span className="sr-only">Loading completion News</span><div aria-hidden="true"><span className="block h-3 w-24 rounded bg-secondary" /><span className="mt-2 block h-6 w-44 rounded bg-secondary" /><span className="mt-3 block h-4 w-full rounded bg-secondary/80" /><span className="mt-4 block h-11 w-28 rounded-full bg-secondary" /></div></section>;
+}
+export function FetchFormSkeleton({ label }: { label: string }) {
+  return <div role="status" aria-label={label} className="mt-5 space-y-3 motion-safe:animate-pulse"><span className="sr-only">{label}</span><div aria-hidden="true" className="space-y-3"><div><span className="block h-3 w-28 rounded bg-secondary" /><span className="mt-2 block h-11 w-full rounded-lg bg-secondary" /></div><div><span className="block h-3 w-24 rounded bg-secondary" /><span className="mt-2 block h-20 w-full rounded-lg bg-secondary" /></div></div></div>;
+}
+
 export function FeedSkeleton({ variant = "staff" }: { variant?: "citizen" | "staff" }) {
   const citizen = variant === "citizen";
   return <div role="status" aria-label="Loading published updates" className="space-y-5 motion-safe:animate-pulse"><span className="sr-only">Loading published updates</span>{Array.from({ length: 3 }, (_, index) => <article key={index} className="overflow-hidden rounded-sm border border-primary/10 bg-white shadow-sm">

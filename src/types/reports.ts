@@ -8,8 +8,6 @@ export type ReportDraft = {
   longitude: string;
   confirmed: boolean;
   accuracyMeters: number | null;
-  regionId: string;
-  locationDescription: string;
   description: string;
 };
 export type ReportPayload = {
@@ -33,10 +31,11 @@ export type OwnReport = {
   reviewStatus: "NEW" | "UNDER_REVIEW" | "NEEDS_DETAILS" | "REVIEWED" | "DECLINED";
   progress?: { id: string; stage: string; description: string; createdAt: string; actorDisplay: string; attachments?: { id: string; filename: string; contentType: string; size: number }[] }[];
   region: { id: string; name: string; timezone: string } | null;
-  case: { number: string; verificationStatus: string; handlingStatus: string } | null;
+  case: { number: string; title?: string; verificationStatus: string; handlingStatus: string; perimeter?: import("@/lib/perimeter").PublicPerimeter | null } | null;
   windContext?: import("@/lib/wind").WindContext | null;
   attachments: { id: string; filename: string; size: number; contentType: string }[];
-  updates?: { id: string; message: string; kind: string; authorRole: string; createdAt: string }[];
+  coverAttachment?: { id: string; filename: string } | null;
+  updates?: { id: string; message: string; kind: string; authorRole: string; createdAt: string; attachments: { id: string; filename: string; contentType: string; size: number }[] }[];
 };
 export type ReportList = { data: OwnReport[]; meta: { total: number; page: number; pageSize: number } };
 export type ReportPhoto = { file: File; preview: string; id?: string; intentId?: string; uploaded?: boolean; progress: number; error?: string };

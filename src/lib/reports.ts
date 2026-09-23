@@ -17,12 +17,11 @@ export function reportPayload(draft: ReportDraft, attachmentIds: string[], idemp
   const latitude = hasPoint ? Number(draft.latitude) : null;
   const longitude = hasPoint ? Number(draft.longitude) : null;
   if (hasPoint && (!draft.latitude.trim() || !draft.longitude.trim() || !Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude!) > 90 || Math.abs(longitude!) > 180)) throw new Error("Enter valid latitude and longitude together.");
+  if (!hasPoint) throw new Error("Choose a point on the map or use your GPS location.");
   if (!draft.confirmed) throw new Error("Confirm the location information before continuing.");
-  if (!hasPoint && !draft.regionId) throw new Error("Select a verified region or provide coordinates.");
-  if ((!hasPoint && draft.locationDescription.trim().length < 5) || draft.locationDescription.trim().length > 1000) throw new Error("Without a map point, describe the location using 5–1,000 characters.");
   if (draft.description.trim().length < 5 || draft.description.trim().length > 2000) throw new Error("Describe your observation using 5–2,000 characters.");
   if (attachmentIds.length > 5 || new Set(attachmentIds).size !== attachmentIds.length) throw new Error("Choose up to five different photos.");
-  return { observationTypes: [...new Set(draft.observationTypes)], observedAt, locationMode: draft.locationMode, latitude, longitude, accuracyMeters: hasPoint ? draft.accuracyMeters : null, regionId: hasPoint ? null : draft.regionId || null, locationDescription: draft.locationDescription.trim(), description: draft.description.trim(), attachmentIds, idempotencyKey };
+  return { observationTypes: [...new Set(draft.observationTypes)], observedAt, locationMode: draft.locationMode, latitude, longitude, accuracyMeters: draft.accuracyMeters, regionId: null, locationDescription: "", description: draft.description.trim(), attachmentIds, idempotencyKey };
 }
 export function validatePhoto(file: Pick<File, "name" | "type" | "size">): string {
   const extensions: Record<string, RegExp> = { "image/jpeg": /\.jpe?g$/i, "image/png": /\.png$/i, "image/webp": /\.webp$/i };

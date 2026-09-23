@@ -1,7 +1,7 @@
 export type DashboardUser = { id: string; name: string; email: string; image?: string; role: "USER" | "ADMIN"; canConfirmIncidents?: boolean; canPublishInformation?: boolean };
 export type Verification = "UNVERIFIED" | "CONFIRMED_FIRE" | "NOT_FIRE";
 export type Handling = "OPEN" | "CHECK_SCHEDULED" | "ON_SCENE" | "RESPONDING" | "MONITORING" | "CLOSED";
-export type Priority = "HIGH" | "MEDIUM" | "LOW" | "UNASSESSED";
+export type Priority = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "UNASSESSED";
 export type MapItem = {
   id: string;
   kind: "publication" | "hotspot";
@@ -31,6 +31,7 @@ export type MapData = {
   privateReports: import("./government").GovernmentReport[];
   privateCases: CaseItem[];
   privateLimited: boolean;
+  operationalFeatures: OperationalMapFeature[];
   demoAreas?: DemoArea[];
   updatedAt: string | null;
   sourceStatus: "AVAILABLE" | "STALE" | "NOT_CONFIGURED" | "NOT_SYNCED" | "UNAVAILABLE";
@@ -53,6 +54,7 @@ export type CaseItem = {
   perimeter: import("@/lib/perimeter").Polygon | null;
   perimeterRevision: number;
 };
+export type OperationalMapFeature = { id: string; name: string; kind: "ROAD" | "WATER_SOURCE"; latitude: number; longitude: number; condition: string | null; observedAt: string | null };
 export type CaseEvidence = { id: string; version: number; fieldUpdates: { id: string; findings: string; observedAt: string; latitude: number | null; longitude: number | null }[] };
 export type CasesData = { items: CaseItem[]; total: number; page: number; pageSize: number };
 export type CaseFilters = { query: string; verification: string; handling?: string; priority: string; page: number; all?: boolean };
@@ -79,21 +81,30 @@ export type MonitoringSummary = {
 };
 export type SourceHealth = {
   database: "connected" | "unavailable";
-  sources: { id: "FIRMS" | "BMKG" | "AI"; name: string; status: "AVAILABLE" | "STALE" | "NOT_CONFIGURED" | "NOT_SYNCED" | "UNAVAILABLE" | "RUNNING" | "SUCCEEDED" | "FAILED" | "OBSOLETE"; message: string | null; lastSuccessAt: string | null }[];
+  sources: { id: "FIRMS" | "GOOGLE_WEATHER" | "AI"; name: string; status: "AVAILABLE" | "STALE" | "NOT_CONFIGURED" | "NOT_SYNCED" | "ON_DEMAND" | "UNAVAILABLE" | "RUNNING" | "SUCCEEDED" | "FAILED" | "OBSOLETE"; message: string | null; lastSuccessAt: string | null }[];
   uploadsAvailable: boolean;
   emailAvailable: boolean;
   googleAvailable: boolean;
 };
-export type MonitoringUser = { id: string; name: string; email: string; role: "USER" | "ADMIN"; active: boolean; emailVerified: boolean; canConfirmIncidents: boolean; canPublishInformation: boolean; createdAt: string; updatedAt: string };
+export type MonitoringUser = { id: string; name: string; email: string; image: string | null; role: "USER" | "ADMIN"; active: boolean; emailVerified: boolean; canConfirmIncidents: boolean; canPublishInformation: boolean; createdAt: string; updatedAt: string };
 export type MonitoringUsers = { data: MonitoringUser[]; meta: { total: number; page: number; pageSize: number } };
 export type MonitoringUserPatch = { expectedUpdatedAt: string; name?: string; role?: "USER" | "ADMIN"; active?: boolean; reason: string; mandate?: string };
+export type MonitoringAvatarUpdate = { image: string; updatedAt: string };
 export type OperationalSubject = { id: string; active: boolean; version: number; createdAt: string; updatedAt: string; sample: boolean; latestCondition: string | null; latestObservedAt: string | null };
+export type MonitoringTeam = OperationalSubject & { name: string; organization: string | null; activeAssignmentCount: number; performance: { totalAssignments: number; completedAssignments: number; cancelledAssignments: number; fieldResults: number; averageCompletionMinutes: number | null } };
+export type MonitoringEquipment = OperationalSubject & { name: string; kind: string; teamId: string | null; currentAssignment: { id: string; caseId: string; caseNumber: string; caseTitle: string; status: string } | null };
+export type MonitoringFeature = { id: string; name: string | null; kind: "ROAD" | "RIVER" | "WATER_SOURCE" | "DESIGNATED_LOCATION"; latitude: number; longitude: number; provider: string; verifiedAt: string | null; authoritative: boolean; sample: boolean; latestCondition: string | null; latestObservedAt: string | null };
+export type MonitoringOperationalUpdate = { id: string; subjectType: "TEAM" | "EQUIPMENT" | "FEATURE"; subjectId: string; condition: string; source: string; observedAt: string; notes: string | null; createdAt: string; sample: boolean };
+export type MonitoringAssignment = { id: string; caseId: string; caseNumber: string; caseTitle: string; caseVerification: string; caseHandling: string; teamId: string; teamName: string; status: "ASSIGNED" | "ACCEPTED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED"; notes: string | null; version: number; sample: boolean; result: { id: string; findings: string; observedAt: string } | null; acceptedAt: string | null; startedAt: string | null; completedAt: string | null; cancelledAt: string | null; createdAt: string; updatedAt: string };
+export type MonitoringTeamDetail = { item: MonitoringTeam; updates: MonitoringOperationalUpdate[] };
+export type MonitoringEquipmentDetail = { item: MonitoringEquipment; teams: { id: string; name: string; active: boolean }[]; updates: MonitoringOperationalUpdate[] };
+export type MonitoringFeatureDetail = { item: MonitoringFeature; updates: MonitoringOperationalUpdate[] };
 export type MonitoringOperations = {
   asOf: string;
-  teams: (OperationalSubject & { name: string; organization: string | null; activeAssignmentCount: number })[];
-  equipment: (OperationalSubject & { name: string; kind: string; teamId: string | null })[];
-  features: { id: string; name: string | null; kind: "ROAD" | "RIVER" | "WATER_SOURCE" | "DESIGNATED_LOCATION"; provider: string; verifiedAt: string | null; authoritative: boolean; sample: boolean; latestCondition: string | null; latestObservedAt: string | null }[];
-  updates: { id: string; subjectType: "TEAM" | "EQUIPMENT" | "FEATURE"; subjectId: string; condition: string; source: string; observedAt: string; notes: string | null; createdAt: string; sample: boolean }[];
-  assignments: { id: string; caseId: string; caseNumber: string; caseTitle: string; caseVerification: string; caseHandling: string; teamId: string; teamName: string; status: "ASSIGNED" | "ACCEPTED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED"; notes: string | null; version: number; sample: boolean; createdAt: string; updatedAt: string }[];
+  teams: MonitoringTeam[];
+  equipment: MonitoringEquipment[];
+  features: MonitoringFeature[];
+  updates: MonitoringOperationalUpdate[];
+  assignments: MonitoringAssignment[];
   counts: { teams: number; availableTeams: number; equipment: number; availableEquipment: number; activeAssignments: number; access: number; passableAccess: number; water: number; availableWater: number };
 };

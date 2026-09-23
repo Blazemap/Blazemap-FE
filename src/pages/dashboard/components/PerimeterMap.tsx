@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { LngLatBounds, Marker, type GeoJSONSource, type Map, type MapMouseEvent } from "maplibre-gl";
 import type { FeatureCollection, Geometry } from "geojson";
-import type { CaseItem, MapItem } from "@/types";
+import type { CaseItem, MapItem, OwnReport } from "@/types";
 import { editDraft, type PerimeterDraft } from "@/lib/perimeter";
 import type { PerimeterEditorProps } from "./CasePerimeter";
 
@@ -80,6 +80,44 @@ export function PrivatePerimeters({ map, cases, selectedCaseId, blocked, onSelec
     if (!blocked && selected?.perimeter) fit(map, selected.perimeter.coordinates.flat());
   }, [map, cases, selectedCaseId, blocked]);
   return failed ? <p role="alert" className="absolute right-4 top-32 z-10 rounded-lg bg-white p-3 text-xs">Private perimeter rendering failed. Use the worklist.</p> : null;
+}
+export function OwnPerimeters({ map, reports, selected, blocked, onSelect }: { map: Map; reports: OwnReport[]; selected: OwnReport | null; blocked: boolean; onSelect: (id: string) => void }) {
+  const latest = useRef({ blocked, onSelect });
+  const [failed, setFailed] = useState(false);
+  useEffect(() => { latest.current = { blocked, onSelect }; });
+  useEffect(() => {
+    map.addSource("own-report-perimeters", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+    map.addLayer({ id: "own-perimeter-fill", type: "fill", source: "own-report-perimeters", paint: { "fill-color": "#c2410c", "fill-opacity": 0.22 } });
+    map.addLayer({ id: "own-perimeter-outline", type: "line", source: "own-report-perimeters", paint: { "line-color": "#9a3412", "line-width": 3 } });
+    const click = (event: MapMouseEvent) => {
+      if (latest.current.blocked) return;
+      const feature = map.queryRenderedFeatures(event.point, { layers: ["own-perimeter-fill", "own-perimeter-outline"] })[0];
+      if (typeof feature?.properties.id === "string") latest.current.onSelect(feature.properties.id);
+    };
+    map.on("click", ["own-perimeter-fill", "own-perimeter-outline"], click);
+    return () => {
+      map.off("click", ["own-perimeter-fill", "own-perimeter-outline"], click);
+      if (map.getLayer("own-perimeter-outline")) map.removeLayer("own-perimeter-outline");
+      if (map.getLayer("own-perimeter-fill")) map.removeLayer("own-perimeter-fill");
+      if (map.getSource("own-report-perimeters")) map.removeSource("own-report-perimeters");
+    };
+  }, [map]);
+  useEffect(() => {
+    const seen = new Set<string>();
+    const data: FeatureCollection = { type: "FeatureCollection", features: reports.flatMap(report => {
+      const linked = report.case;
+      if (linked?.verificationStatus !== "CONFIRMED_FIRE" || linked.handlingStatus === "CLOSED" || !linked.perimeter || seen.has(linked.number)) return [];
+      seen.add(linked.number);
+      return [{ type: "Feature" as const, geometry: linked.perimeter.geometry, properties: { id: report.id } }];
+    }) };
+    let disposed = false;
+    void (map.getSource("own-report-perimeters") as GeoJSONSource | undefined)?.setData(data).then(() => { if (!disposed) setFailed(false); }).catch(() => { if (!disposed) setFailed(true); });
+    return () => { disposed = true; };
+  }, [map, reports]);
+  useEffect(() => {
+    if (!blocked && selected?.case?.perimeter && selected.case.handlingStatus !== "CLOSED") fit(map, selected.case.perimeter.geometry.coordinates.flat());
+  }, [map, selected, blocked]);
+  return failed ? <p role="alert" className="absolute right-4 top-32 z-10 rounded-lg bg-white p-3 text-xs">Your report boundary could not render. Open My reports for details.</p> : null;
 }
 export function PerimeterDrawing({ map, draft, setDraft }: { map: Map; draft: PerimeterDraft; setDraft: PerimeterEditorProps["setDraft"] }) {
   const latest = useRef(draft);

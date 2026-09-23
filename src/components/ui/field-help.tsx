@@ -2,6 +2,10 @@ import { useId, type ReactNode } from "react";
 import { Popover } from "radix-ui";
 import { Button } from "./button";
 
+export function FieldLength({ value, min, max }: { value: string; min: number; max: number }) {
+  return <span className="mt-1 block text-xs font-normal text-muted-foreground">{value.length} / {max} characters · minimum {min}</span>;
+}
+
 export function FieldHelp({ title, children }: { title: string; children: ReactNode }) {
   const id = useId();
   return <Popover.Root>

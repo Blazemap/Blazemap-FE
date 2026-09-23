@@ -1,34 +1,14 @@
-import CaseWeatherReference from "./CaseWeatherReference";
-import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { getForecastRegions, updateCaseForecastRegion } from "@/api/dashboard/government";
-import { Button } from "@/components/ui";
-import { useGovernmentMutation } from "@/hooks/dashboard/useGovernment";
-import type { DashboardUser } from "@/types";
+import { weatherSummary } from "@/lib/bmkg";
+import { formatTime } from "@/pages/dashboard/utils";
 import type { CaseDetail } from "@/types/government";
 
-export default function CaseForecastRegion({ user, detail, refresh }: { user: DashboardUser; detail: CaseDetail; refresh: () => void }) {
-  const regions = useQuery({ queryKey: ["dashboard", user.id, user.role, "bmkg-regions"], queryFn: ({ signal }) => getForecastRegions(signal), retry: false, gcTime: 0 });
-  const [regionId, setRegionId] = useState(detail.regionId ?? "");
-  const [reason, setReason] = useState("");
-  const mutation = useGovernmentMutation(user, async () => {
-    await updateCaseForecastRegion(detail.id, { version: detail.version, regionId: regionId || null, reason: reason.trim() });
-    setReason("");
-    refresh();
-  });
-  const changed = regionId !== (detail.regionId ?? "");
-  return <section aria-label="Forecast region mapping" className="mt-5 space-y-3 border-t pt-4">
-    <h4 className="font-bold">BMKG forecast region</h4>
-    <p className="text-xs">Operator-selected mapping only. Coordinates are not matched to an administrative area because no verified boundary dataset is available.</p>
-    {regions.isPending && <p role="status" className="text-xs">Loading verified BMKG mappings…</p>}
-    {regions.isError && <div role="alert" className="text-xs"><p>Verified BMKG mappings could not be loaded.</p><Button type="button" variant="outline" className="mt-2" onClick={() => void regions.refetch()}>Retry mappings</Button></div>}
-    {regions.data?.length === 0 && <p role="status" className="text-xs">No verified administrative level IV BMKG mappings are available. Import and verify an actual boundary dataset and ADM4 mapping before selection.</p>}
-    {regions.data && <form onSubmit={event => { event.preventDefault(); if (changed && reason.trim()) mutation.mutate(); }}>
-      <label htmlFor="case-forecast-region" className="block text-xs font-bold">Verified mapping<select id="case-forecast-region" className="mt-2 min-h-11 w-full rounded-sm border bg-white px-3 text-sm" value={regionId} onChange={event => setRegionId(event.target.value)}><option value="">No forecast region</option>{regions.data.map(region => <option key={region.id} value={region.id}>{region.name} · {region.code}</option>)}</select></label>
-      <label htmlFor="case-forecast-region-reason" className="mt-3 block text-xs font-bold">Change reason <span aria-hidden="true">*</span><textarea id="case-forecast-region-reason" required aria-required="true" minLength={5} maxLength={2000} rows={2} className="mt-2 w-full rounded-sm border p-3 text-sm" value={reason} onChange={event => setReason(event.target.value)} /></label>
-      {mutation.isError && <p role="alert" className="mt-2 text-xs text-red-800">The forecast region was not changed. Refresh and review the verified mapping before retrying.</p>}
-      <Button type="submit" variant="outline" className="mt-3" disabled={!changed || reason.trim().length < 5 || mutation.isPending}>{mutation.isPending ? "Saving…" : "Save forecast region"}</Button>
-    </form>}
-    <CaseWeatherReference key={`${detail.id}-${detail.version}`} user={user} detail={detail} refresh={refresh} />
+export default function CaseForecastRegion({ detail }: { detail: CaseDetail }) {
+  const resolution = detail.weatherResolution;
+  const summary = weatherSummary(resolution);
+  return <section aria-labelledby="case-weather-heading" className="mt-5 space-y-3 border-t pt-4">
+    <div className="flex items-start justify-between gap-3"><div><h4 id="case-weather-heading" className="font-bold">Current weather</h4><p className="mt-1 text-xs text-muted-foreground">Conditions at case coordinates, not an on-site measurement or incident confirmation.</p></div><span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-bold">{summary.availability}</span></div>
+    {!resolution.forecast && <p className="text-sm">Current weather at the case coordinates is unavailable.</p>}
+    {resolution.forecast && <><p className="text-xs text-muted-foreground">{resolution.provenance?.attribution ?? resolution.forecast.attribution}</p><dl className="grid grid-cols-3 gap-2 text-xs"><div><dt className="font-bold">Temperature</dt><dd>{summary.temperature === null ? "—" : `${summary.temperature} °C`}</dd></div><div><dt className="font-bold">Humidity</dt><dd>{summary.humidity === null ? "—" : `${summary.humidity}%`}</dd></div><div><dt className="font-bold">Wind</dt><dd>{summary.windSpeed === null ? "—" : `${summary.windSpeed} km/h`}</dd></div></dl>
+      <details><summary className="min-h-11 cursor-pointer text-xs font-bold">Weather source details</summary><dl className="grid gap-2 text-xs sm:grid-cols-2"><div><dt className="font-bold">Source</dt><dd>{resolution.provenance?.attribution ?? resolution.forecast.attribution}</dd></div><div><dt className="font-bold">Location basis</dt><dd>{summary.basis}</dd></div><div><dt className="font-bold">Observed</dt><dd>{summary.validAt ? formatTime(summary.validAt) : "—"}</dd></div><div><dt className="font-bold">Fetched</dt><dd>{summary.fetchedAt ? formatTime(summary.fetchedAt) : "—"}</dd></div><div><dt className="font-bold">Usable until</dt><dd>{summary.usableUntil ? formatTime(summary.usableUntil) : "—"}</dd></div></dl></details></>}
   </section>;
 }

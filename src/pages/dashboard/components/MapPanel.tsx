@@ -7,7 +7,7 @@ export default function MapPanel({ title, count, open, desktop, side = "right", 
   const handle = useRef<HTMLButtonElement>(null);
   const opener = useRef<HTMLElement | null>(null);
   const [box, setBox] = useState(() => boundPanel({ x: side === "left" ? 24 : side === "center" ? Math.max(48, (window.innerWidth - 420) / 2) : window.innerWidth - 444, y: 96, width: side === "left" ? 380 : 420, height: window.innerHeight - 120 }, { width: window.innerWidth, height: window.innerHeight }));
-  const [height, setHeight] = useState(68);
+  const [height, setHeight] = useState(side === "center" ? 52 : 68);
   const gesture = useRef<{ x: number; y: number; box: typeof box; height: number; resize: boolean } | null>(null);
   function adjust(next: typeof box) { setBox(boundPanel(next, { width: window.innerWidth, height: window.innerHeight })); }
   useEffect(() => {
@@ -47,8 +47,8 @@ export default function MapPanel({ title, count, open, desktop, side = "right", 
   }
   const end = () => { gesture.current = null; };
   if (!open && !keepMounted) return null;
-  return <aside ref={panel} aria-label={title} data-map-panel={side} hidden={!open} inert={!open} onKeyDown={event => { if (event.key === "Escape" && !disabled) { event.stopPropagation(); onClose(); } }} style={{ display: open ? "flex" : "none", ...(desktop ? { left: box.x, top: box.y, width: box.width, height: box.height } : { height: `${drawing ? Math.min(height, 38) : height}dvh` }) }} className={`absolute z-40 flex-col overflow-hidden border border-primary/10 bg-white text-forest shadow-2xl ${desktop ? "resize rounded-sm" : "inset-x-0 bottom-0 rounded-t-2xl"}`}>
-    <header className="flex shrink-0 items-center gap-3 border-b border-primary/10 bg-white px-5 py-3">
+  return <aside ref={panel} aria-label={title} data-map-panel={side} hidden={!open} inert={!open} onKeyDown={event => { if (event.key === "Escape" && !disabled) { event.stopPropagation(); onClose(); } }} style={{ display: open ? "flex" : "none", ...(desktop ? { left: box.x, top: box.y, width: box.width, height: box.height } : { height: `${drawing ? Math.min(height, 38) : height}dvh` }) }} className={`absolute z-40 flex-col overflow-hidden border border-primary/10 bg-white text-forest shadow-[0_28px_80px_-28px_rgba(31,41,55,0.45)] ${desktop ? "resize rounded-2xl" : "inset-x-0 bottom-0 rounded-t-2xl"}`}>
+    <header className="flex shrink-0 items-center gap-3 border-b border-primary/10 bg-white px-6 py-4">
       <h2 className="min-w-0 flex-1"><button ref={handle} type="button" aria-label={`${title}. ${desktop ? "Move panel using arrow keys or drag" : "Resize sheet using up and down arrow keys or drag"}`} onPointerDown={event => start(event)} onPointerMove={move} onPointerUp={end} onPointerCancel={end} onLostPointerCapture={end} onKeyDown={event => keyboard(event)} className="min-h-11 w-full touch-none cursor-move text-left focus-visible:outline-2 focus-visible:outline-primary"><span className="block text-lg font-extrabold">{title}</span>{count && <span className="mt-1 block text-xs font-normal text-muted-foreground">{count}</span>}</button></h2>
       <button type="button" disabled={disabled} onClick={onClose} aria-label={`Close ${title}`} className="grid size-11 shrink-0 place-items-center rounded-full hover:bg-secondary disabled:opacity-50"><X size={20} aria-hidden="true" /></button>
     </header>
