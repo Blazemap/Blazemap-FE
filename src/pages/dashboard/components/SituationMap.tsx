@@ -192,7 +192,7 @@ export default function SituationMap({ place = null, focusPoint = null, items, s
   useEffect(() => {
     if (!readyMap || state !== "ready" || perimeterDraft || onPick) return;
     const publishedCaseNumbers = new Set(items.flatMap(item => item.publicPerimeter && item.caseNumber ? [item.caseNumber] : []));
-    const markers = ownReports.filter(hasPoint).filter(report => report.case?.handlingStatus !== "CLOSED" && !report.case?.perimeter && (!report.case || !publishedCaseNumbers.has(report.case.number))).map(report => {
+    const markers = ownReports.filter(hasPoint).filter(report => report.case?.handlingStatus !== "CLOSED" && (selectedOwnReport?.id === report.id || !report.case?.perimeter && (!report.case || !publishedCaseNumbers.has(report.case.number)))).map(report => {
       const button = document.createElement("button");
       button.type = "button";
       const selectedMarker = selectedOwnReport?.id === report.id;
@@ -223,7 +223,7 @@ export default function SituationMap({ place = null, focusPoint = null, items, s
     if (readyMap && selectedReport && hasPoint(selectedReport) && !perimeterDraft) readyMap.jumpTo({ center: [selectedReport.longitude, selectedReport.latitude], zoom: Math.max(readyMap.getZoom(), 9), padding: mapPanelPadding() });
   }, [readyMap, selectedReport, perimeterDraft]);
   useEffect(() => {
-    if (readyMap && selectedOwnReport && !selectedOwnReport.case?.perimeter && selectedOwnReport.case?.handlingStatus !== "CLOSED" && hasPoint(selectedOwnReport) && !perimeterDraft) readyMap.jumpTo({ center: [selectedOwnReport.longitude, selectedOwnReport.latitude], zoom: Math.max(readyMap.getZoom(), 11), padding: mapPanelPadding() });
+    if (readyMap && selectedOwnReport && selectedOwnReport.case?.handlingStatus !== "CLOSED" && hasPoint(selectedOwnReport) && !perimeterDraft) readyMap.jumpTo({ center: [selectedOwnReport.longitude, selectedOwnReport.latitude], zoom: Math.max(readyMap.getZoom(), 11), padding: mapPanelPadding() });
   }, [readyMap, selectedOwnReport, perimeterDraft]);
   useEffect(() => {
     if (readyMap && focusPoint && !perimeterDraft) readyMap.jumpTo({ center: [focusPoint.longitude, focusPoint.latitude], zoom: Math.max(readyMap.getZoom(), 12), padding: mapPanelPadding() });
