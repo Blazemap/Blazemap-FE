@@ -14,7 +14,7 @@ import { OperationsDetailSkeleton } from "./MonitoringSkeletons";
 import { Condition, ConditionCreate, ConditionHistory, EmptyPanel, Freshness, InventoryHeader, OperationalFeatureCreate, OperationsDialog, OperationsSectionPage, OperationsSnapshot, panelClass, StatusPill } from "./OperationsShared";
 
 function FeatureRow({ item }: { item: MonitoringFeature }) {
-  return <li className="grid gap-3 px-5 py-4 sm:grid-cols-[1fr_auto]"><div><p className="font-extrabold">{item.name || "Unnamed operational feature"}</p><p className="mt-1 text-xs text-muted-foreground">{item.provider} · {item.latitude.toFixed(5)}, {item.longitude.toFixed(5)} · {item.authoritative ? "Verified source" : "Not authoritative"}</p><div className="mt-2"><Condition condition={item.latestCondition} /></div><Freshness observedAt={item.latestObservedAt} /></div><Button asChild variant="outline"><Link to={encodeURIComponent(item.id)}>View details</Link></Button></li>;
+  return <li className="grid gap-3 px-5 py-4 sm:grid-cols-[1fr_auto]"><div><p className="font-extrabold">{item.name || "Unnamed operational feature"}</p><p className="mt-1 text-xs text-muted-foreground">{item.provider} · {item.latitude.toFixed(5)}, {item.longitude.toFixed(5)} · {item.authoritative ? "Verified source" : "Not authoritative"}</p><div className="mt-2"><Condition condition={item.latestCondition} /></div><Freshness observedAt={item.latestObservedAt} /></div><Button asChild variant="outline" className="h-11 justify-self-start sm:justify-self-end"><Link to={encodeURIComponent(item.id)}>View details</Link></Button></li>;
 }
 
 export default function OperationsAccessWaterPage() {

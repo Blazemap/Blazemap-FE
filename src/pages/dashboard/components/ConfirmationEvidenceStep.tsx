@@ -31,9 +31,9 @@ export default function ConfirmationEvidenceStep({ id, evidence, value, onChange
   const eligible = eligibleConfirmationEvidence(evidence);
   const selected = eligible.find(item => item.id === value.fieldUpdateId);
   return <section aria-labelledby={`${id}-heading`} className="space-y-3 rounded-lg border border-primary/15 bg-secondary/25 p-4">
-    <div><h5 id={`${id}-heading`} className="text-sm font-extrabold">Assigned field result</h5><p className="mt-1 text-xs text-muted-foreground">Only a coordinate-backed visible-fire result from a team assigned to this case can support confirmation.</p></div>
-    {!eligible.length ? <p role="status" className="rounded-md bg-white p-3 text-sm">No eligible result yet. Assign a team, move the assignment into field work, and record its result first.</p> : <>
-      <label htmlFor={`${id}-existing`} className="block text-xs font-bold">Visible-fire result <span aria-hidden="true">*</span><FieldSelect id={`${id}-existing`} required disabled={disabled} value={value.fieldUpdateId} onValueChange={fieldUpdateId => onChange({ ...value, fieldUpdateId })} placeholder="Select assigned field result" options={eligible.map(item => ({ value: item.id, label: `${item.assignment?.team.name ?? "Assigned team"} · ${formatTime(item.observedAt)} · ${item.source}` }))} /></label>
+    <h5 id={`${id}-heading`} className="text-sm font-extrabold">Team observation</h5>
+    {!eligible.length ? <p role="status" className="rounded-md bg-white p-3 text-sm">Record an observation from the assigned team before drawing the boundary.</p> : <>
+      <label htmlFor={`${id}-existing`} className="block text-xs font-bold">Observation of fire <span aria-hidden="true">*</span><FieldSelect id={`${id}-existing`} required disabled={disabled} value={value.fieldUpdateId} onValueChange={fieldUpdateId => onChange({ ...value, fieldUpdateId })} placeholder="Select team observation" options={eligible.map(item => ({ value: item.id, label: `${item.assignment?.team.name ?? "Assigned team"} · ${formatTime(item.observedAt)} · ${item.source}` }))} /></label>
       {selected && <div className="rounded-md bg-white p-3 text-xs"><p className="whitespace-pre-wrap">{("description" in selected && typeof selected.description === "string" && selected.description) || "No observation note supplied."}</p><p className="mt-2 font-bold">{selected.assignment?.team.name}</p><p className="mt-1 text-muted-foreground">{selected.source} · {formatTime(selected.observedAt)}</p></div>}
     </>}
   </section>;
